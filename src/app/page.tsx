@@ -5,7 +5,7 @@ const games = [
   { name: 'Chess', icon: '♔', alt: 'Chess King', href: '/chess' },
   { name: 'Checkers', icon: '●', alt: 'Checkers piece', href: '/checkers' },
   { name: 'Backgammon', icon: '⚀', alt: 'Backgammon die', href: '/backgammon' },
-  { name: 'Gin Rummy', icon: '🃏', alt: 'Gin Rummy card', href: null },
+  { name: 'Gin Rummy', icon: '🃏', alt: 'Gin Rummy card', href: '/ginRummy' },
   { name: 'Crazy 8s', icon: '🎴', alt: 'Crazy 8s card', href: null },
 ];
 
