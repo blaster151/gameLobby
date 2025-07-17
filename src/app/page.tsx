@@ -18,9 +18,10 @@ export default function Home() {
           Play Backgammon, Checkers, Chess, Gin Rummy, and Crazy 8s with friends or bots.<br />
           Each game includes a tutorial. Remote multiplayer coming soon!
         </p>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '2rem', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '2rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
           <Link href="/lobbies" style={{ background: '#2563eb', color: 'white', padding: '1rem 2rem', borderRadius: 8, textDecoration: 'none', fontWeight: 600 }}>Browse Lobbies</Link>
           <Link href="/create-lobby" style={{ background: '#22c55e', color: 'white', padding: '1rem 2rem', borderRadius: 8, textDecoration: 'none', fontWeight: 600 }}>Create Lobby</Link>
+          <Link href="/replays" style={{ background: '#7c3aed', color: 'white', padding: '1rem 2rem', borderRadius: 8, textDecoration: 'none', fontWeight: 600 }}>📺 Replays</Link>
         </div>
         <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: '2rem 0 1rem' }}>Available Games</h2>
         <ul style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', listStyle: 'none', padding: 0 }}>
