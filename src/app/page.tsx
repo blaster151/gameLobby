@@ -17,7 +17,7 @@ export default function Home() {
         <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: '2rem 0 1rem' }}>Available Games</h2>
         <ul style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', listStyle: 'none', padding: 0 }}>
           <li>♔ Chess</li>
-          <li>● Checkers</li>
+          <li><Link href="/checkers" style={{ color: 'white', textDecoration: 'underline' }}>● Checkers</Link></li>
           <li>⚀ Backgammon</li>
           <li>🃏 Gin Rummy</li>
           <li>🎴 Crazy 8s</li>
