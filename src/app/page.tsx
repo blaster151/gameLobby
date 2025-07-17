@@ -6,7 +6,7 @@ const games = [
   { name: 'Checkers', icon: '●', alt: 'Checkers piece', href: '/checkers' },
   { name: 'Backgammon', icon: '⚀', alt: 'Backgammon die', href: '/backgammon' },
   { name: 'Gin Rummy', icon: '🃏', alt: 'Gin Rummy card', href: '/ginRummy' },
-  { name: 'Crazy 8s', icon: '🎴', alt: 'Crazy 8s card', href: null },
+  { name: 'Crazy 8s', icon: '🎴', alt: 'Crazy 8s card', href: '/crazy8s' },
 ];
 
 export default function Home() {
@@ -23,6 +23,9 @@ export default function Home() {
           <Link href="/create-lobby" style={{ background: '#22c55e', color: 'white', padding: '1rem 2rem', borderRadius: 8, textDecoration: 'none', fontWeight: 600 }}>Create Lobby</Link>
           <Link href="/replays" style={{ background: '#7c3aed', color: 'white', padding: '1rem 2rem', borderRadius: 8, textDecoration: 'none', fontWeight: 600 }}>📺 Replays</Link>
           <Link href="/challenges" style={{ background: '#ea580c', color: 'white', padding: '1rem 2rem', borderRadius: 8, textDecoration: 'none', fontWeight: 600 }}>🎯 Challenges</Link>
+          <Link href="/analytics" style={{ background: '#0891b2', color: 'white', padding: '1rem 2rem', borderRadius: 8, textDecoration: 'none', fontWeight: 600 }}>📊 Analytics</Link>
+          <Link href="/settings" style={{ background: '#6b7280', color: 'white', padding: '1rem 2rem', borderRadius: 8, textDecoration: 'none', fontWeight: 600 }}>⚙️ Settings</Link>
+          <Link href="/achievements" style={{ background: '#f59e0b', color: 'white', padding: '1rem 2rem', borderRadius: 8, textDecoration: 'none', fontWeight: 600 }}>🏆 Achievements</Link>
         </div>
         <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: '2rem 0 1rem' }}>Available Games</h2>
         <ul style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', listStyle: 'none', padding: 0 }}>
