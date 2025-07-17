@@ -117,12 +117,14 @@ interface ChessState {
   stats: GameStats;
   botDifficulty: BotDifficulty;
   lastMove: [number, number, number, number] | null;
+  pendingPromotion: [number, number] | null;
   setBoard: (b: Board) => void;
   setSelected: (p: Pos) => void;
   setTurn: (t: PlayerColor) => void;
   setMessage: (m: string) => void;
   setGameState: (s: string) => void;
   setLastMove: (move: [number, number, number, number] | null) => void;
+  setPendingPromotion: (pos: [number, number] | null) => void;
   resetGame: () => void;
   pushHistory: (b: Board) => void;
   stepHistory: (dir: 1 | -1) => void;
@@ -156,12 +158,14 @@ export const useChessStore = create<ChessState>((set, get) => {
     stats: typeof window !== 'undefined' ? loadStats() : { wins: 0, losses: 0, totalGames: 0 },
     botDifficulty: initialState.botDifficulty,
     lastMove: null,
+    pendingPromotion: null,
     setBoard: (b) => set({ board: b }),
     setSelected: (p) => set({ selected: p }),
     setTurn: (t) => set({ turn: t }),
     setMessage: (m) => set({ message: m }),
     setGameState: (s) => set({ gameState: s }),
     setLastMove: (move) => set({ lastMove: move }),
+    setPendingPromotion: (pos) => set({ pendingPromotion: pos }),
     resetGame: () => set(state => {
       const newState = {
         board: initialBoard(),

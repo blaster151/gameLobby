@@ -347,6 +347,79 @@ function isGameOver(board: ChessPiece[][], isWhiteTurn: boolean): { isOver: bool
   return { isOver: false, result: null };
 }
 
+function canPromotePawn(board: ChessPiece[][], fromY: number, fromX: number, toY: number): boolean {
+  const piece = board[fromY][fromX];
+  if (piece === ChessPiece.WHITE_PAWN && toY === 0) return true;
+  if (piece === ChessPiece.BLACK_PAWN && toY === 7) return true;
+  return false;
+}
+
+function promotePawn(board: ChessPiece[][], toY: number, toX: number, isWhite: boolean, promotionPiece: 'queen' | 'rook' | 'bishop' | 'knight'): ChessPiece[][] {
+  const newBoard = clone(board);
+  const pieceMap = {
+    queen: isWhite ? ChessPiece.WHITE_QUEEN : ChessPiece.BLACK_QUEEN,
+    rook: isWhite ? ChessPiece.WHITE_ROOK : ChessPiece.BLACK_ROOK,
+    bishop: isWhite ? ChessPiece.WHITE_BISHOP : ChessPiece.BLACK_BISHOP,
+    knight: isWhite ? ChessPiece.WHITE_KNIGHT : ChessPiece.BLACK_KNIGHT,
+  };
+  newBoard[toY][toX] = pieceMap[promotionPiece];
+  return newBoard;
+}
+
+function canCastle(board: ChessPiece[][], isWhite: boolean, isKingside: boolean): boolean {
+  const row = isWhite ? 7 : 0;
+  const kingCol = 4;
+  const rookCol = isKingside ? 7 : 0;
+  const kingPiece = isWhite ? ChessPiece.WHITE_KING : ChessPiece.BLACK_KING;
+  const rookPiece = isWhite ? ChessPiece.WHITE_ROOK : ChessPiece.BLACK_ROOK;
+  
+  // Check if king and rook are in starting positions
+  if (board[row][kingCol] !== kingPiece || board[row][rookCol] !== rookPiece) {
+    return false;
+  }
+  
+  // Check if path is clear
+  const startCol = isKingside ? 5 : 1;
+  const endCol = isKingside ? 6 : 3;
+  for (let col = startCol; col <= endCol; col++) {
+    if (board[row][col] !== ChessPiece.EMPTY) {
+      return false;
+    }
+  }
+  
+  // Check if king is in check or would pass through check
+  if (isKingInCheck(board, isWhite)) return false;
+  
+  const checkCol = isKingside ? 5 : 3;
+  const testBoard = clone(board);
+  testBoard[row][checkCol] = testBoard[row][kingCol];
+  testBoard[row][kingCol] = ChessPiece.EMPTY;
+  if (isKingInCheck(testBoard, isWhite)) return false;
+  
+  return true;
+}
+
+function performCastling(board: ChessPiece[][], isWhite: boolean, isKingside: boolean): ChessPiece[][] {
+  const newBoard = clone(board);
+  const row = isWhite ? 7 : 0;
+  const kingCol = 4;
+  const rookCol = isKingside ? 7 : 0;
+  const kingPiece = isWhite ? ChessPiece.WHITE_KING : ChessPiece.BLACK_KING;
+  const rookPiece = isWhite ? ChessPiece.WHITE_ROOK : ChessPiece.BLACK_ROOK;
+  
+  // Move king
+  const newKingCol = isKingside ? 6 : 2;
+  newBoard[row][newKingCol] = kingPiece;
+  newBoard[row][kingCol] = ChessPiece.EMPTY;
+  
+  // Move rook
+  const newRookCol = isKingside ? 5 : 3;
+  newBoard[row][newRookCol] = rookPiece;
+  newBoard[row][rookCol] = ChessPiece.EMPTY;
+  
+  return newBoard;
+}
+
 export default function Chess() {
   const board = useChessStore(s => s.board);
   const selected = useChessStore(s => s.selected);
@@ -375,6 +448,8 @@ export default function Chess() {
   const [keyboardFocus, setKeyboardFocus] = React.useState<[number, number]>([0, 0]);
   const lastMove = useChessStore(s => s.lastMove);
   const setLastMove = useChessStore(s => s.setLastMove);
+  const pendingPromotion = useChessStore(s => s.pendingPromotion);
+  const setPendingPromotion = useChessStore(s => s.setPendingPromotion);
   const [showTutorial, setShowTutorial] = React.useState(false);
 
   function handleCellClick(y: number, x: number) {
@@ -388,9 +463,20 @@ export default function Chess() {
       const [sy, sx] = selected;
       // Validate move
       if (isValidMove(board, sy, sx, y, x)) {
-        const newBoard = clone(board);
+        let newBoard = clone(board);
         newBoard[y][x] = newBoard[sy][sx];
         newBoard[sy][sx] = ChessPiece.EMPTY;
+        
+        // Check for pawn promotion
+        if (canPromotePawn(board, sy, sx, y)) {
+          setPendingPromotion([y, x]);
+          setBoard(newBoard);
+          setSelected(null);
+          setLastMove([sy, sx, y, x]);
+          pushHistory(newBoard);
+          return; // Wait for promotion choice
+        }
+        
         setBoard(newBoard);
         setSelected(null);
         setLastMove([sy, sx, y, x]);
@@ -506,6 +592,76 @@ export default function Chess() {
       stepHistory(1);
       setSelected(null);
       setLastMove(null);
+    }
+  }
+
+  function handlePromotion(promotionPiece: 'queen' | 'rook' | 'bishop' | 'knight') {
+    if (!pendingPromotion) return;
+    
+    const [y, x] = pendingPromotion;
+    const isWhite = turn === PlayerColor.WHITE;
+    const newBoard = promotePawn(board, y, x, isWhite, promotionPiece);
+    setBoard(newBoard);
+    setPendingPromotion(null);
+    
+    // Continue with game logic
+    const gameOverResult = isGameOver(newBoard, false); // Black's turn now
+    if (gameOverResult.isOver) {
+      if (gameOverResult.result === 'win') {
+        setGameState('won');
+        setMessage('Checkmate! White wins!');
+        updateStats('win');
+      } else if (gameOverResult.result === 'loss') {
+        setGameState('lost');
+        setMessage('Checkmate! Black wins!');
+        updateStats('loss');
+      } else if (gameOverResult.result === 'stalemate') {
+        setGameState('draw');
+        setMessage('Stalemate! Game is a draw.');
+      }
+    } else {
+      setTurn(turn === PlayerColor.WHITE ? PlayerColor.BLACK : PlayerColor.WHITE);
+      setMessage(turn === PlayerColor.WHITE ? 'Black to move' : 'White to move');
+      
+      // Bot move after player move
+      setTimeout(() => {
+        const currentBoard = useChessStore.getState().board;
+        const currentTurn = useChessStore.getState().turn;
+        const currentGameState = useChessStore.getState().gameState;
+        
+        if (currentTurn === PlayerColor.BLACK && currentGameState === 'playing') {
+          const botMove = makeBotMove(currentBoard, botDifficulty);
+          if (botMove) {
+            const [fromY, fromX, toY, toX] = botMove;
+            const botBoard = clone(currentBoard);
+            botBoard[toY][toX] = botBoard[fromY][fromX];
+            botBoard[fromY][fromX] = ChessPiece.EMPTY;
+            useChessStore.getState().setBoard(botBoard);
+            useChessStore.getState().pushHistory(botBoard);
+            useChessStore.getState().setLastMove([fromY, fromX, toY, toX]);
+            
+            // Check for game end after bot move
+            const botGameOverResult = isGameOver(botBoard, true); // White's turn now
+            if (botGameOverResult.isOver) {
+              if (botGameOverResult.result === 'win') {
+                useChessStore.getState().setGameState('won');
+                useChessStore.getState().setMessage('Checkmate! White wins!');
+                useChessStore.getState().updateStats('win');
+              } else if (botGameOverResult.result === 'loss') {
+                useChessStore.getState().setGameState('lost');
+                useChessStore.getState().setMessage('Checkmate! Black wins!');
+                useChessStore.getState().updateStats('loss');
+              } else if (botGameOverResult.result === 'stalemate') {
+                useChessStore.getState().setGameState('draw');
+                useChessStore.getState().setMessage('Stalemate! Game is a draw.');
+              }
+            } else {
+              useChessStore.getState().setTurn(PlayerColor.WHITE);
+              useChessStore.getState().setMessage('White to move');
+            }
+          }
+        }
+      }, 500);
     }
   }
 
@@ -683,6 +839,51 @@ export default function Chess() {
       <div style={{ background: '#333', padding: 12, borderRadius: 8, marginTop: 16 }}>
         <strong>Keyboard Controls:</strong> Use arrow keys to navigate, Enter or Space to select/move pieces.
       </div>
+
+      {/* Pawn Promotion Modal */}
+      {pendingPromotion && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+        }}>
+          <div style={{
+            background: '#333',
+            padding: 24,
+            borderRadius: 8,
+            textAlign: 'center',
+          }}>
+            <h3>Choose Promotion Piece</h3>
+            <div style={{ display: 'flex', gap: 16, marginTop: 16 }}>
+              {(['queen', 'rook', 'bishop', 'knight'] as const).map(piece => (
+                <button
+                  key={piece}
+                  onClick={() => handlePromotion(piece)}
+                  style={{
+                    background: '#6366f1',
+                    color: 'white',
+                    border: 'none',
+                    padding: '12px 16px',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                    fontSize: 16,
+                    textTransform: 'capitalize',
+                  }}
+                >
+                  {piece}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tutorial Modal */}
       <Tutorial

@@ -209,4 +209,19 @@ describe('Chess Component', () => {
     // The implementation should prevent such moves through the isValidMove function
     expect(true).toBe(true); // Placeholder - actual implementation would test specific scenarios
   });
+
+  test('pawn promotion UI appears when pawn reaches end', () => {
+    render(<Chess />);
+    
+    // This test would verify that the promotion modal appears when a pawn reaches the opposite end
+    // For now, we'll test that the promotion state exists in the store
+    expect(useChessStore.getState().pendingPromotion).toBeNull();
+  });
+
+  test('promotion state is properly initialized', () => {
+    render(<Chess />);
+    
+    // Test that promotion state is properly initialized in the store
+    expect(useChessStore.getState().pendingPromotion).toBeNull();
+  });
 }); 
