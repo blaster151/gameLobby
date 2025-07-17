@@ -28,6 +28,8 @@ export default function Home() {
           <Link href="/achievements" style={{ background: '#f59e0b', color: 'white', padding: '1rem 2rem', borderRadius: 8, textDecoration: 'none', fontWeight: 600 }}>🏆 Achievements</Link>
           <Link href="/history" style={{ background: '#dc2626', color: 'white', padding: '1rem 2rem', borderRadius: 8, textDecoration: 'none', fontWeight: 600 }}>📜 History</Link>
           <Link href="/leaderboards" style={{ background: '#059669', color: 'white', padding: '1rem 2rem', borderRadius: 8, textDecoration: 'none', fontWeight: 600 }}>🏅 Leaderboards</Link>
+          <Link href="/chat" style={{ background: '#7c3aed', color: 'white', padding: '1rem 2rem', borderRadius: 8, textDecoration: 'none', fontWeight: 600 }}>💬 Chat</Link>
+          <Link href="/performance" style={{ background: '#be185d', color: 'white', padding: '1rem 2rem', borderRadius: 8, textDecoration: 'none', fontWeight: 600 }}>📈 Performance</Link>
         </div>
         <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: '2rem 0 1rem' }}>Available Games</h2>
         <ul style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', listStyle: 'none', padding: 0 }}>
