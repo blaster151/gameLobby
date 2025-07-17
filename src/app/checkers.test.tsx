@@ -69,4 +69,9 @@ describe('Checkers', () => {
     expect(screen.getByText('Your move!')).toBeInTheDocument();
     expect(screen.queryByText(/You win!|You lose!/)).not.toBeInTheDocument();
   });
+
+  it('renders Back to Lobby link', () => {
+    render(<Checkers />);
+    expect(screen.getByText('← Back to Lobby')).toBeInTheDocument();
+  });
 }); 
