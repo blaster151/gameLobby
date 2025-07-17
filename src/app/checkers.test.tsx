@@ -43,4 +43,10 @@ describe('Checkers', () => {
       expect(screen.getByText(/Your move!|Bot cannot move/)).toBeInTheDocument();
     }
   });
+
+  it('renders the tutorial section for Checkers', () => {
+    render(<Checkers />);
+    expect(screen.getByText(/How to Play:/)).toBeInTheDocument();
+    expect(screen.getByText(/Move your pieces diagonally forward/)).toBeInTheDocument();
+  });
 }); 

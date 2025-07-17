@@ -87,6 +87,9 @@ export default function Checkers() {
     <div style={{ padding: 24, color: 'white', minHeight: '100vh', background: '#222' }}>
       <Link href="/" style={{ color: '#60a5fa', textDecoration: 'underline' }}>← Back to Lobby</Link>
       <h1 style={{ fontSize: '2rem', margin: '1rem 0' }}>Checkers</h1>
+      <div style={{ background: '#333', padding: 12, borderRadius: 8, marginBottom: 16 }}>
+        <strong>How to Play:</strong> Move your pieces diagonally forward. Capture opponent pieces by jumping over them. First to lose all pieces loses the game. (This is a simplified version.)
+      </div>
       <div style={{ marginBottom: 12 }}>{message}</div>
       <div style={{ display: 'inline-block', border: '2px solid #fff' }}>
         {board.map((row, y) => (
