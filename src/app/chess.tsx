@@ -271,6 +271,82 @@ function makeBotMove(board: ChessPiece[][], difficulty: BotDifficulty): [number,
   return validMoves[0];
 }
 
+function isKingInCheck(board: ChessPiece[][], isWhiteKing: boolean): boolean {
+  // Find the king
+  const kingPiece = isWhiteKing ? ChessPiece.WHITE_KING : ChessPiece.BLACK_KING;
+  let kingY = -1, kingX = -1;
+  
+  for (let y = 0; y < BOARD_SIZE; y++) {
+    for (let x = 0; x < BOARD_SIZE; x++) {
+      if (board[y][x] === kingPiece) {
+        kingY = y;
+        kingX = x;
+        break;
+      }
+    }
+    if (kingY !== -1) break;
+  }
+  
+  if (kingY === -1) return false; // King not found
+  
+  // Check if any opponent piece can attack the king
+  for (let y = 0; y < BOARD_SIZE; y++) {
+    for (let x = 0; x < BOARD_SIZE; x++) {
+      const piece = board[y][x];
+      if (piece !== ChessPiece.EMPTY) {
+        const isOpponentPiece = isWhiteKing ? isBlackPiece(piece) : isWhitePiece(piece);
+        if (isOpponentPiece && isValidMove(board, y, x, kingY, kingX)) {
+          return true;
+        }
+      }
+    }
+  }
+  
+  return false;
+}
+
+function isCheckmate(board: ChessPiece[][], isWhiteTurn: boolean): boolean {
+  // First check if king is in check
+  if (!isKingInCheck(board, isWhiteTurn)) return false;
+  
+  // Check if any move can get out of check
+  const validMoves = getAllValidMoves(board, isWhiteTurn);
+  
+  for (const [fromY, fromX, toY, toX] of validMoves) {
+    const testBoard = clone(board);
+    testBoard[toY][toX] = testBoard[fromY][fromX];
+    testBoard[fromY][fromX] = ChessPiece.EMPTY;
+    
+    // If this move gets us out of check, it's not checkmate
+    if (!isKingInCheck(testBoard, isWhiteTurn)) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+function isStalemate(board: ChessPiece[][], isWhiteTurn: boolean): boolean {
+  // King is not in check
+  if (isKingInCheck(board, isWhiteTurn)) return false;
+  
+  // No valid moves available
+  const validMoves = getAllValidMoves(board, isWhiteTurn);
+  return validMoves.length === 0;
+}
+
+function isGameOver(board: ChessPiece[][], isWhiteTurn: boolean): { isOver: boolean; result: 'checkmate' | 'stalemate' | 'win' | 'loss' | null } {
+  if (isCheckmate(board, isWhiteTurn)) {
+    return { isOver: true, result: isWhiteTurn ? 'loss' : 'win' };
+  }
+  
+  if (isStalemate(board, isWhiteTurn)) {
+    return { isOver: true, result: 'stalemate' };
+  }
+  
+  return { isOver: false, result: null };
+}
+
 export default function Chess() {
   const board = useChessStore(s => s.board);
   const selected = useChessStore(s => s.selected);
@@ -319,28 +395,66 @@ export default function Chess() {
         setSelected(null);
         setLastMove([sy, sx, y, x]);
         pushHistory(newBoard);
-        setTurn(turn === PlayerColor.WHITE ? PlayerColor.BLACK : PlayerColor.WHITE);
-        setMessage(turn === PlayerColor.WHITE ? 'Black to move' : 'White to move');
         
-        // Bot move after player move
-        setTimeout(() => {
-          const currentBoard = useChessStore.getState().board;
-          const currentTurn = useChessStore.getState().turn;
-          if (currentTurn === PlayerColor.BLACK) {
-            const botMove = makeBotMove(currentBoard, botDifficulty);
-            if (botMove) {
-              const [fromY, fromX, toY, toX] = botMove;
-              const botBoard = clone(currentBoard);
-              botBoard[toY][toX] = botBoard[fromY][fromX];
-              botBoard[fromY][fromX] = ChessPiece.EMPTY;
-              useChessStore.getState().setBoard(botBoard);
-              useChessStore.getState().pushHistory(botBoard);
-              useChessStore.getState().setTurn(PlayerColor.WHITE);
-              useChessStore.getState().setMessage('White to move');
-              useChessStore.getState().setLastMove([fromY, fromX, toY, toX]);
-            }
+        // Check for game end after player move
+        const gameOverResult = isGameOver(newBoard, false); // Black's turn now
+        if (gameOverResult.isOver) {
+          if (gameOverResult.result === 'win') {
+            setGameState('won');
+            setMessage('Checkmate! White wins!');
+            updateStats('win');
+          } else if (gameOverResult.result === 'loss') {
+            setGameState('lost');
+            setMessage('Checkmate! Black wins!');
+            updateStats('loss');
+          } else if (gameOverResult.result === 'stalemate') {
+            setGameState('draw');
+            setMessage('Stalemate! Game is a draw.');
           }
-        }, 500);
+        } else {
+          setTurn(turn === PlayerColor.WHITE ? PlayerColor.BLACK : PlayerColor.WHITE);
+          setMessage(turn === PlayerColor.WHITE ? 'Black to move' : 'White to move');
+          
+          // Bot move after player move
+          setTimeout(() => {
+            const currentBoard = useChessStore.getState().board;
+            const currentTurn = useChessStore.getState().turn;
+            const currentGameState = useChessStore.getState().gameState;
+            
+            if (currentTurn === PlayerColor.BLACK && currentGameState === 'playing') {
+              const botMove = makeBotMove(currentBoard, botDifficulty);
+              if (botMove) {
+                const [fromY, fromX, toY, toX] = botMove;
+                const botBoard = clone(currentBoard);
+                botBoard[toY][toX] = botBoard[fromY][fromX];
+                botBoard[fromY][fromX] = ChessPiece.EMPTY;
+                useChessStore.getState().setBoard(botBoard);
+                useChessStore.getState().pushHistory(botBoard);
+                useChessStore.getState().setLastMove([fromY, fromX, toY, toX]);
+                
+                // Check for game end after bot move
+                const botGameOverResult = isGameOver(botBoard, true); // White's turn now
+                if (botGameOverResult.isOver) {
+                  if (botGameOverResult.result === 'win') {
+                    useChessStore.getState().setGameState('won');
+                    useChessStore.getState().setMessage('Checkmate! White wins!');
+                    useChessStore.getState().updateStats('win');
+                  } else if (botGameOverResult.result === 'loss') {
+                    useChessStore.getState().setGameState('lost');
+                    useChessStore.getState().setMessage('Checkmate! Black wins!');
+                    useChessStore.getState().updateStats('loss');
+                  } else if (botGameOverResult.result === 'stalemate') {
+                    useChessStore.getState().setGameState('draw');
+                    useChessStore.getState().setMessage('Stalemate! Game is a draw.');
+                  }
+                } else {
+                  useChessStore.getState().setTurn(PlayerColor.WHITE);
+                  useChessStore.getState().setMessage('White to move');
+                }
+              }
+            }
+          }, 500);
+        }
       }
     } else if (isPlayerTurn && isPlayerPiece) {
       setSelected([y, x]);
