@@ -113,6 +113,14 @@ export default function Checkers() {
     return newBoard;
   }
 
+  function resetGame() {
+    setBoard(initialBoard());
+    setSelected(null);
+    setTurn(PLAYER);
+    setMessage('Your move!');
+    setGameState('playing');
+  }
+
   return (
     <div style={{ padding: 24, color: 'white', minHeight: '100vh', background: '#222' }}>
       <Link href="/" style={{ color: '#60a5fa', textDecoration: 'underline' }}>← Back to Lobby</Link>
@@ -121,6 +129,20 @@ export default function Checkers() {
         <strong>How to Play:</strong> Move your pieces diagonally forward. Capture opponent pieces by jumping over them. First to lose all pieces loses the game. (This is a simplified version.)
       </div>
       <div style={{ marginBottom: 12 }}>{message}</div>
+      <button 
+        onClick={resetGame}
+        style={{ 
+          background: '#dc2626', 
+          color: 'white', 
+          border: 'none',
+          padding: '8px 16px', 
+          borderRadius: 4, 
+          cursor: 'pointer',
+          marginBottom: 16 
+        }}
+      >
+        New Game
+      </button>
       <div style={{ display: 'inline-block', border: '2px solid #fff' }}>
         {board.map((row, y) => (
           <div key={y} style={{ display: 'flex' }}>

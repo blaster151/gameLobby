@@ -56,4 +56,17 @@ describe('Checkers', () => {
     expect(screen.getByText(/How to Play:/)).toBeInTheDocument();
     expect(screen.getByText(/Move your pieces diagonally forward/)).toBeInTheDocument();
   });
+
+  it('renders New Game button and resets game state when clicked', () => {
+    render(<Checkers />);
+    const newGameButton = screen.getByText('New Game');
+    expect(newGameButton).toBeInTheDocument();
+    
+    // Click the New Game button
+    fireEvent.click(newGameButton);
+    
+    // Game should be reset to initial state
+    expect(screen.getByText('Your move!')).toBeInTheDocument();
+    expect(screen.queryByText(/You win!|You lose!/)).not.toBeInTheDocument();
+  });
 }); 
