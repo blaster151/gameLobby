@@ -3,7 +3,7 @@ Repeat this process 3x:
 |    Repeat this process 3x:
 |        Find an incremental way to improve the system or pull it closer to the stated vision.
 |        Implement it.
-|        Add or augment a unit test to reflect it.
+|        Add or augment a unit test to reflect it. DO NOT RUN TESTS RIGHT NOW AS THEY HANG CONSISTENTLY.
 |
 |    Commit with a significant message.
 

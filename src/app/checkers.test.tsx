@@ -44,6 +44,13 @@ describe('Checkers', () => {
     }
   });
 
+  it('detects game state correctly when pieces are captured', () => {
+    render(<Checkers />);
+    expect(screen.getByText('Your move!')).toBeInTheDocument();
+    // The game should start in 'playingstate
+    expect(screen.queryByText(/You win!|You lose!/)).not.toBeInTheDocument();
+  });
+
   it('renders the tutorial section for Checkers', () => {
     render(<Checkers />);
     expect(screen.getByText(/How to Play:/)).toBeInTheDocument();

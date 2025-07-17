@@ -24,17 +24,33 @@ export default function Checkers() {
   const [selected, setSelected] = useState<Pos>(null);
   const [turn, setTurn] = useState<Cell>(PLAYER);
   const [message, setMessage] = useState<string>('Your move!');
+  const [gameState, setGameState] = useState<string>('playing');
+
+  function checkGameState(board: Board): string {
+    const playerPieces = board.flat().filter(cell => cell === PLAYER).length;
+    const botPieces = board.flat().filter(cell => cell === BOT).length;
+    
+    if (playerPieces === 0) return 'lose';
+    if (botPieces === 0) return 'win';
+    return 'playing';
+  }
 
   function handleCellClick(y: number, x: number) {
-    if (turn !== PLAYER) return;
+    if (turn !== PLAYER || gameState !== 'playing') return;
     if (selected) {
       const [sy, sx] = selected;
       if (isValidMove(board, sy, sx, y, x, PLAYER)) {
         const newBoard = movePiece(board, sy, sx, y, x);
         setBoard(newBoard);
         setSelected(null);
-        setTurn(BOT);
-        setTimeout(() => botMove(newBoard), 500);
+        const newGameState = checkGameState(newBoard);
+        setGameState(newGameState);
+        if (newGameState === 'playing') {
+          setTurn(BOT);
+          setTimeout(() => botMove(newBoard), 500);
+        } else {
+          setMessage(newGameState === 'win' ? 'You win!' : 'You lose!');
+        }
       } else {
         setSelected(null);
       }
@@ -51,15 +67,29 @@ export default function Checkers() {
           const nx1 = x - 1, nx2 = x + 1;
           if (ny < BOARD_SIZE) {
             if (nx1 >= 0 && currentBoard[ny][nx1] === EMPTY) {
-              setBoard(movePiece(currentBoard, y, x, ny, nx1));
-              setTurn(PLAYER);
-              setMessage('Your move!');
+              const newBoard = movePiece(currentBoard, y, x, ny, nx1);
+              setBoard(newBoard);
+              const newGameState = checkGameState(newBoard);
+              setGameState(newGameState);
+              if (newGameState === 'playing') {
+                setTurn(PLAYER);
+                setMessage('Your move!');
+              } else {
+                setMessage(newGameState === 'lose' ? 'You lose!' : 'You win!');
+              }
               return;
             }
             if (nx2 < BOARD_SIZE && currentBoard[ny][nx2] === EMPTY) {
-              setBoard(movePiece(currentBoard, y, x, ny, nx2));
-              setTurn(PLAYER);
-              setMessage('Your move!');
+              const newBoard = movePiece(currentBoard, y, x, ny, nx2);
+              setBoard(newBoard);
+              const newGameState = checkGameState(newBoard);
+              setGameState(newGameState);
+              if (newGameState === 'playing') {
+                setTurn(PLAYER);
+                setMessage('Your move!');
+              } else {
+                setMessage(newGameState === 'lose' ? 'You lose!' : 'You win!');
+              }
               return;
             }
           }
