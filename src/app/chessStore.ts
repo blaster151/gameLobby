@@ -1,0 +1,230 @@
+import { create } from 'zustand';
+
+export enum ChessPiece {
+  EMPTY = 0,
+  WHITE_PAWN = 1,
+  WHITE_ROOK = 2,
+  WHITE_KNIGHT = 3,
+  WHITE_BISHOP = 4,
+  WHITE_QUEEN = 5,
+  WHITE_KING = 6,
+  BLACK_PAWN = 7,
+  BLACK_ROOK = 8,
+  BLACK_KNIGHT = 9,
+  BLACK_BISHOP = 10,
+  BLACK_QUEEN = 11,
+  BLACK_KING = 12,
+}
+
+export enum PlayerColor {
+  WHITE = 'white',
+  BLACK = 'black',
+}
+
+export enum BotDifficulty {
+  EASY = 'easy',
+  MEDIUM = 'medium',
+  HARD = 'hard',
+}
+
+export type Cell = ChessPiece;
+export type Board = Cell[][];
+export type Pos = [number, number] | null;
+
+const BOARD_SIZE = 8;
+
+function initialBoard(): Board {
+  const board: Board = Array.from({ length: BOARD_SIZE }, () => Array<Cell>(BOARD_SIZE).fill(ChessPiece.EMPTY));
+  
+  // Set up black pieces (top)
+  board[0] = [
+    ChessPiece.BLACK_ROOK, ChessPiece.BLACK_KNIGHT, ChessPiece.BLACK_BISHOP, ChessPiece.BLACK_QUEEN,
+    ChessPiece.BLACK_KING, ChessPiece.BLACK_BISHOP, ChessPiece.BLACK_KNIGHT, ChessPiece.BLACK_ROOK
+  ];
+  board[1] = Array(8).fill(ChessPiece.BLACK_PAWN);
+  
+  // Set up white pieces (bottom)
+  board[6] = Array(8).fill(ChessPiece.WHITE_PAWN);
+  board[7] = [
+    ChessPiece.WHITE_ROOK, ChessPiece.WHITE_KNIGHT, ChessPiece.WHITE_BISHOP, ChessPiece.WHITE_QUEEN,
+    ChessPiece.WHITE_KING, ChessPiece.WHITE_BISHOP, ChessPiece.WHITE_KNIGHT, ChessPiece.WHITE_ROOK
+  ];
+  
+  return board;
+}
+
+function clone(board: Board): Board {
+  return board.map(row => [...row]);
+}
+
+interface GameStats {
+  wins: number;
+  losses: number;
+  totalGames: number;
+}
+
+function loadStats(): GameStats {
+  if (typeof window !== 'undefined') {
+    const raw = localStorage.getItem('chessStats');
+    if (raw) {
+      try {
+        return JSON.parse(raw);
+      } catch {}
+    }
+  }
+  return { wins: 0, losses: 0, totalGames: 0 };
+}
+
+function saveStats(stats: GameStats) {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('chessStats', JSON.stringify(stats));
+  }
+}
+
+function saveGameState(state: any) {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('chessGameState', JSON.stringify({
+      board: state.board,
+      turn: state.turn,
+      gameState: state.gameState,
+      history: state.history,
+      historyIndex: state.historyIndex,
+      botDifficulty: state.botDifficulty,
+    }));
+  }
+}
+
+function loadGameState(): any {
+  if (typeof window !== 'undefined') {
+    const raw = localStorage.getItem('chessGameState');
+    if (raw) {
+      try {
+        return JSON.parse(raw);
+      } catch {}
+    }
+  }
+  return null;
+}
+
+interface ChessState {
+  board: Board;
+  selected: Pos;
+  turn: PlayerColor;
+  message: string;
+  gameState: string;
+  history: Board[];
+  historyIndex: number;
+  stats: GameStats;
+  botDifficulty: BotDifficulty;
+  lastMove: [number, number, number, number] | null;
+  setBoard: (b: Board) => void;
+  setSelected: (p: Pos) => void;
+  setTurn: (t: PlayerColor) => void;
+  setMessage: (m: string) => void;
+  setGameState: (s: string) => void;
+  setLastMove: (move: [number, number, number, number] | null) => void;
+  resetGame: () => void;
+  pushHistory: (b: Board) => void;
+  stepHistory: (dir: 1 | -1) => void;
+  updateStats: (result: 'win' | 'loss') => void;
+  resetStats: () => void;
+  setBotDifficulty: (difficulty: BotDifficulty) => void;
+  saveGame: () => void;
+  loadGame: () => void;
+  hasSavedGame: () => boolean;
+}
+
+export const useChessStore = create<ChessState>((set, get) => {
+  const savedState = loadGameState();
+  const initialState = savedState || {
+    board: initialBoard(),
+    turn: PlayerColor.WHITE,
+    gameState: 'playing',
+    history: [initialBoard()],
+    historyIndex: 0,
+    botDifficulty: BotDifficulty.MEDIUM,
+  };
+
+  return {
+    board: initialState.board,
+    selected: null,
+    turn: initialState.turn,
+    message: initialState.gameState === 'playing' ? 'White to move' : 'Game Over',
+    gameState: initialState.gameState,
+    history: initialState.history,
+    historyIndex: initialState.historyIndex,
+    stats: typeof window !== 'undefined' ? loadStats() : { wins: 0, losses: 0, totalGames: 0 },
+    botDifficulty: initialState.botDifficulty,
+    lastMove: null,
+    setBoard: (b) => set({ board: b }),
+    setSelected: (p) => set({ selected: p }),
+    setTurn: (t) => set({ turn: t }),
+    setMessage: (m) => set({ message: m }),
+    setGameState: (s) => set({ gameState: s }),
+    setLastMove: (move) => set({ lastMove: move }),
+    resetGame: () => set(state => {
+      const newState = {
+        board: initialBoard(),
+        selected: null,
+        turn: PlayerColor.WHITE,
+        message: 'White to move',
+        gameState: 'playing',
+        history: [initialBoard()],
+        historyIndex: 0,
+        stats: state.stats,
+        botDifficulty: state.botDifficulty,
+      };
+      saveStats(state.stats);
+      return newState;
+    }),
+    pushHistory: (b) => {
+      const { history, historyIndex } = get();
+      const newHistory = history.slice(0, historyIndex + 1).concat([clone(b)]);
+      set({ history: newHistory, historyIndex: newHistory.length - 1 });
+    },
+    stepHistory: (dir) => {
+      const { history, historyIndex, setBoard } = get();
+      const newIndex = Math.max(0, Math.min(history.length - 1, historyIndex + dir));
+      set({ historyIndex: newIndex });
+      setBoard(clone(history[newIndex]));
+    },
+    updateStats: (result) => {
+      const { stats } = get();
+      const newStats = {
+        ...stats,
+        totalGames: stats.totalGames + 1,
+        wins: result === 'win' ? stats.wins + 1 : stats.wins,
+        losses: result === 'loss' ? stats.losses + 1 : stats.losses,
+      };
+      set({ stats: newStats });
+      saveStats(newStats);
+    },
+    resetStats: () => {
+      const zeroStats = { wins: 0, losses: 0, totalGames: 0 };
+      set({ stats: zeroStats });
+      saveStats(zeroStats);
+    },
+    setBotDifficulty: (difficulty) => set({ botDifficulty: difficulty }),
+    saveGame: () => {
+      const state = get();
+      saveGameState(state);
+    },
+    loadGame: () => {
+      const savedState = loadGameState();
+      if (savedState) {
+        set({
+          board: savedState.board,
+          turn: savedState.turn,
+          gameState: savedState.gameState,
+          history: savedState.history,
+          historyIndex: savedState.historyIndex,
+          botDifficulty: savedState.botDifficulty,
+          message: savedState.gameState === 'playing' ? 'White to move' : 'Game Over',
+        });
+      }
+    },
+    hasSavedGame: () => {
+      return loadGameState() !== null;
+    },
+  };
+}); 

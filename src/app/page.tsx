@@ -1,6 +1,14 @@
 import React from 'react';
 import Link from 'next/link';
 
+const games = [
+  { name: 'Chess', icon: '♔', alt: 'Chess King', href: '/chess' },
+  { name: 'Checkers', icon: '●', alt: 'Checkers piece', href: '/checkers' },
+  { name: 'Backgammon', icon: '⚀', alt: 'Backgammon die', href: null },
+  { name: 'Gin Rummy', icon: '🃏', alt: 'Gin Rummy card', href: null },
+  { name: 'Crazy 8s', icon: '🎴', alt: 'Crazy 8s card', href: null },
+];
+
 export default function Home() {
   return (
     <main style={{ minHeight: '100vh', background: 'linear-gradient(to bottom right, #1e3a8a, #6d28d9, #312e81)', color: 'white', padding: '2rem' }}>
@@ -16,11 +24,17 @@ export default function Home() {
         </div>
         <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: '2rem 0 1rem' }}>Available Games</h2>
         <ul style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', listStyle: 'none', padding: 0 }}>
-          <li>♔ Chess</li>
-          <li><Link href="/checkers" style={{ color: 'white', textDecoration: 'underline' }}>● Checkers</Link></li>
-          <li>⚀ Backgammon</li>
-          <li>🃏 Gin Rummy</li>
-          <li>🎴 Crazy 8s</li>
+          {games.map(game => (
+            <li key={game.name}>
+              {game.href ? (
+                <Link href={game.href} style={{ color: 'white', textDecoration: 'underline' }}>
+                  <span role="img" aria-label={game.alt}>{game.icon}</span> {game.name}
+                </Link>
+              ) : (
+                <span><span role="img" aria-label={game.alt}>{game.icon}</span> {game.name}</span>
+              )}
+            </li>
+          ))}
         </ul>
       </div>
     </main>
