@@ -440,4 +440,214 @@ describe('Checkers', () => {
       expect(useCheckersStore.getState().selected).toEqual([3, 3]);
     });
   });
+
+  describe('Forced Capture Validation', () => {
+    test('enforces mandatory captures when available', () => {
+      // Set up a board with a capture opportunity
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[3][3] = PieceType.PLAYER; // Player piece
+      testBoard[4][4] = PieceType.BOT; // Bot piece to capture
+      testBoard[5][5] = PieceType.EMPTY; // Landing spot
+      
+      useCheckersStore.setState({
+        board: testBoard,
+        turn: PieceType.PLAYER,
+        gameState: 'playing'
+      });
+      
+      render(<Checkers />);
+      
+      // Try to make a regular move (should be invalid due to forced capture)
+      const playerPiece = screen.getByLabelText('4, 4 player piece');
+      fireEvent.click(playerPiece);
+      
+      // Try to move to a non-capture position
+      const invalidDestination = screen.getByLabelText('3, 2 empty');
+      fireEvent.click(invalidDestination);
+      
+      // Check that the piece didn't move (forced capture rule)
+      const updatedBoard = useCheckersStore.getState().board;
+      expect(updatedBoard[3][3]).toBe(PieceType.PLAYER);
+      expect(updatedBoard[4][4]).toBe(PieceType.BOT);
+    });
+
+    test('allows capture moves when captures are available', () => {
+      // Set up a board with a capture opportunity
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[3][3] = PieceType.PLAYER; // Player piece
+      testBoard[4][4] = PieceType.BOT; // Bot piece to capture
+      testBoard[5][5] = PieceType.EMPTY; // Landing spot
+      
+      useCheckersStore.setState({
+        board: testBoard,
+        turn: PieceType.PLAYER,
+        gameState: 'playing'
+      });
+      
+      render(<Checkers />);
+      
+      // Select the player piece
+      const playerPiece = screen.getByLabelText('4, 4 player piece');
+      fireEvent.click(playerPiece);
+      
+      // Make the capture move
+      const captureDestination = screen.getByLabelText('6, 6 empty');
+      fireEvent.click(captureDestination);
+      
+      // Check that the capture occurred
+      const updatedBoard = useCheckersStore.getState().board;
+      expect(updatedBoard[5][5]).toBe(PieceType.PLAYER);
+      expect(updatedBoard[3][3]).toBe(PieceType.EMPTY);
+      expect(updatedBoard[4][4]).toBe(PieceType.EMPTY); // Captured piece removed
+    });
+
+    test('allows regular moves when no captures are available', () => {
+      // Set up a board with no capture opportunities
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[3][3] = PieceType.PLAYER; // Player piece
+      testBoard[4][4] = PieceType.EMPTY; // Empty space for regular move
+      
+      useCheckersStore.setState({
+        board: testBoard,
+        turn: PieceType.PLAYER,
+        gameState: 'playing'
+      });
+      
+      render(<Checkers />);
+      
+      // Select the player piece
+      const playerPiece = screen.getByLabelText('4, 4 player piece');
+      fireEvent.click(playerPiece);
+      
+      // Make a regular move
+      const regularDestination = screen.getByLabelText('5, 5 empty');
+      fireEvent.click(regularDestination);
+      
+      // Check that the regular move was allowed
+      const updatedBoard = useCheckersStore.getState().board;
+      expect(updatedBoard[4][4]).toBe(PieceType.PLAYER);
+      expect(updatedBoard[3][3]).toBe(PieceType.EMPTY);
+    });
+
+    test('enforces captures for king pieces', () => {
+      // Set up a board with a king capture opportunity
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[3][3] = PieceType.PLAYER_KING; // Player king
+      testBoard[4][4] = PieceType.BOT; // Bot piece to capture
+      testBoard[5][5] = PieceType.EMPTY; // Landing spot
+      
+      useCheckersStore.setState({
+        board: testBoard,
+        turn: PieceType.PLAYER,
+        gameState: 'playing'
+      });
+      
+      render(<Checkers />);
+      
+      // Try to make a regular move (should be invalid due to forced capture)
+      const kingPiece = screen.getByLabelText('4, 4 player king');
+      fireEvent.click(kingPiece);
+      
+      // Try to move to a non-capture position
+      const invalidDestination = screen.getByLabelText('2, 2 empty');
+      fireEvent.click(invalidDestination);
+      
+      // Check that the piece didn't move (forced capture rule)
+      const updatedBoard = useCheckersStore.getState().board;
+      expect(updatedBoard[3][3]).toBe(PieceType.PLAYER_KING);
+      expect(updatedBoard[4][4]).toBe(PieceType.BOT);
+    });
+
+    test('allows king capture moves', () => {
+      // Set up a board with a king capture opportunity
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[3][3] = PieceType.PLAYER_KING; // Player king
+      testBoard[4][4] = PieceType.BOT; // Bot piece to capture
+      testBoard[5][5] = PieceType.EMPTY; // Landing spot
+      
+      useCheckersStore.setState({
+        board: testBoard,
+        turn: PieceType.PLAYER,
+        gameState: 'playing'
+      });
+      
+      render(<Checkers />);
+      
+      // Select the king piece
+      const kingPiece = screen.getByLabelText('4, 4 player king');
+      fireEvent.click(kingPiece);
+      
+      // Make the capture move
+      const captureDestination = screen.getByLabelText('6, 6 empty');
+      fireEvent.click(captureDestination);
+      
+      // Check that the capture occurred
+      const updatedBoard = useCheckersStore.getState().board;
+      expect(updatedBoard[5][5]).toBe(PieceType.PLAYER_KING);
+      expect(updatedBoard[3][3]).toBe(PieceType.EMPTY);
+      expect(updatedBoard[4][4]).toBe(PieceType.EMPTY); // Captured piece removed
+    });
+
+    test('prevents invalid capture attempts', () => {
+      // Set up a board with pieces that can't capture
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[3][3] = PieceType.PLAYER; // Player piece
+      testBoard[4][4] = PieceType.PLAYER; // Another player piece (can't capture own piece)
+      testBoard[5][5] = PieceType.EMPTY; // Landing spot
+      
+      useCheckersStore.setState({
+        board: testBoard,
+        turn: PieceType.PLAYER,
+        gameState: 'playing'
+      });
+      
+      render(<Checkers />);
+      
+      // Try to make an invalid capture
+      const playerPiece = screen.getByLabelText('4, 4 player piece');
+      fireEvent.click(playerPiece);
+      
+      // Try to capture own piece (should be invalid)
+      const invalidCaptureDestination = screen.getByLabelText('6, 6 empty');
+      fireEvent.click(invalidCaptureDestination);
+      
+      // Check that the invalid capture was prevented
+      const updatedBoard = useCheckersStore.getState().board;
+      expect(updatedBoard[3][3]).toBe(PieceType.PLAYER);
+      expect(updatedBoard[4][4]).toBe(PieceType.PLAYER);
+      expect(updatedBoard[5][5]).toBe(PieceType.EMPTY);
+    });
+
+    test('handles multiple capture opportunities correctly', () => {
+      // Set up a board with multiple capture opportunities
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[3][3] = PieceType.PLAYER; // Player piece
+      testBoard[4][4] = PieceType.BOT; // First bot piece to capture
+      testBoard[5][5] = PieceType.EMPTY; // Landing spot after first capture
+      testBoard[6][6] = PieceType.BOT; // Second bot piece to capture
+      testBoard[7][7] = PieceType.EMPTY; // Final landing spot
+      
+      useCheckersStore.setState({
+        board: testBoard,
+        turn: PieceType.PLAYER,
+        gameState: 'playing'
+      });
+      
+      render(<Checkers />);
+      
+      // Select the player piece
+      const playerPiece = screen.getByLabelText('4, 4 player piece');
+      fireEvent.click(playerPiece);
+      
+      // Make the first capture
+      const firstCaptureDestination = screen.getByLabelText('6, 6 empty');
+      fireEvent.click(firstCaptureDestination);
+      
+      // Check that the first capture occurred
+      const updatedBoard = useCheckersStore.getState().board;
+      expect(updatedBoard[5][5]).toBe(PieceType.PLAYER);
+      expect(updatedBoard[3][3]).toBe(PieceType.EMPTY);
+      expect(updatedBoard[4][4]).toBe(PieceType.EMPTY); // First captured piece removed
+    });
+  });
 }); 

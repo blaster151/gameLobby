@@ -107,6 +107,14 @@ export default function Checkers() {
 
   function getValidMoves(board: Board, player: PieceType): Array<[number, number, number, number]> {
     const moves: Array<[number, number, number, number]> = [];
+    
+    // First check for captures - if any are available, only captures are valid
+    const captures = getAvailableCaptures(board, player);
+    if (captures.length > 0) {
+      return captures;
+    }
+    
+    // If no captures available, return regular moves
     for (let y = 0; y < BOARD_SIZE; y++) {
       for (let x = 0; x < BOARD_SIZE; x++) {
         const piece = board[y][x];
@@ -131,6 +139,56 @@ export default function Checkers() {
       }
     }
     return moves;
+  }
+
+  function getAvailableCaptures(board: Board, player: PieceType): Array<[number, number, number, number]> {
+    const captures: Array<[number, number, number, number]> = [];
+    
+    for (let y = 0; y < BOARD_SIZE; y++) {
+      for (let x = 0; x < BOARD_SIZE; x++) {
+        const piece = board[y][x];
+        if (piece === player || (player === PieceType.PLAYER && piece === PieceType.PLAYER_KING) || (player === PieceType.BOT && piece === PieceType.BOT_KING)) {
+          const isKingPiece = isKing(piece);
+          const opponent = player === PieceType.PLAYER ? PieceType.BOT : PieceType.PLAYER;
+          const opponentKing = player === PieceType.PLAYER ? PieceType.BOT_KING : PieceType.PLAYER_KING;
+          
+          // Define possible directions
+          const directions = isKingPiece ? [-1, 1] : [player === PieceType.PLAYER ? -1 : 1];
+          
+          for (const dir of directions) {
+            // Check diagonal captures
+            const captureY = y + dir;
+            const captureX1 = x - 1;
+            const captureX2 = x + 1;
+            const landingY = y + (dir * 2);
+            const landingX1 = x - 2;
+            const landingX2 = x + 2;
+            
+            // Check left diagonal capture
+            if (captureY >= 0 && captureY < BOARD_SIZE && captureX1 >= 0 && 
+                (board[captureY][captureX1] === opponent || board[captureY][captureX1] === opponentKing) &&
+                landingY >= 0 && landingY < BOARD_SIZE && landingX1 >= 0 && 
+                board[landingY][landingX1] === PieceType.EMPTY) {
+              captures.push([y, x, landingY, landingX1]);
+            }
+            
+            // Check right diagonal capture
+            if (captureY >= 0 && captureY < BOARD_SIZE && captureX2 < BOARD_SIZE && 
+                (board[captureY][captureX2] === opponent || board[captureY][captureX2] === opponentKing) &&
+                landingY >= 0 && landingY < BOARD_SIZE && landingX2 < BOARD_SIZE && 
+                board[landingY][landingX2] === PieceType.EMPTY) {
+              captures.push([y, x, landingY, landingX2]);
+            }
+          }
+        }
+      }
+    }
+    
+    return captures;
+  }
+
+  function hasAvailableCaptures(board: Board, player: PieceType): boolean {
+    return getAvailableCaptures(board, player).length > 0;
   }
 
   function evaluateBoard(board: Board): number {
@@ -294,10 +352,31 @@ export default function Checkers() {
     // Must move diagonally
     if (xDiff !== Math.abs(yDiff)) return false;
     
+    // Check if this is a capture move
+    const isCapture = Math.abs(yDiff) === 2;
+    
+    // If captures are available, only capture moves are valid
+    if (hasAvailableCaptures(board, player) && !isCapture) {
+      return false;
+    }
+    
     // Regular pieces can only move forward
     if (!isKingPiece) {
       const dir = player === PieceType.PLAYER ? -1 : 1;
       if (yDiff !== dir) return false;
+    }
+    
+    // For capture moves, validate the captured piece
+    if (isCapture) {
+      const captureY = sy + (yDiff / 2);
+      const captureX = sx + ((dx - sx) / 2);
+      const capturedPiece = board[captureY][captureX];
+      const opponent = player === PieceType.PLAYER ? PieceType.BOT : PieceType.PLAYER;
+      const opponentKing = player === PieceType.PLAYER ? PieceType.BOT_KING : PieceType.PLAYER_KING;
+      
+      if (capturedPiece !== opponent && capturedPiece !== opponentKing) {
+        return false;
+      }
     }
     
     // Kings can move in any diagonal direction
@@ -308,9 +387,21 @@ export default function Checkers() {
     const newBoard = clone(board);
     const piece = newBoard[sy][sx];
     
+    // Check if this is a capture move
+    const yDiff = dy - sy;
+    const xDiff = dx - sx;
+    const isCapture = Math.abs(yDiff) === 2;
+    
     // Move the piece
     newBoard[dy][dx] = piece;
     newBoard[sy][sx] = PieceType.EMPTY;
+    
+    // Handle capture
+    if (isCapture) {
+      const captureY = sy + (yDiff / 2);
+      const captureX = sx + (xDiff / 2);
+      newBoard[captureY][captureX] = PieceType.EMPTY;
+    }
     
     // Check for king promotion
     if (isPlayerPiece(piece) && dy === 0) {

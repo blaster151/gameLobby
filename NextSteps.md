@@ -24,7 +24,7 @@ Checkers:
         No visual distinction for king pieces
     Missing multiple jump sequences
         Only single jumps allowed
-        No forced capture validation
+        ✓ No forced capture validation
         Missing "must capture if available" rule
         No chain capture detection
     Basic move validation
