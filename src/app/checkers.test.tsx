@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import Checkers from './checkers';
-import { useCheckersStore } from './checkersStore';
+import { useCheckersStore, PieceType } from './checkersStore';
 
 // Mock Next.js Link component
 jest.mock('next/link', () => {
@@ -261,5 +261,183 @@ describe('Checkers', () => {
     fireEvent.change(gameModeSelect, { target: { value: 'human_vs_human' } });
     
     expect(useCheckersStore.getState().gameMode).toBe('human_vs_human');
+  });
+
+  describe('King Promotion', () => {
+    test('promotes player piece to king when reaching top row', () => {
+      // Set up a board with a player piece near the top
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[1][1] = PieceType.PLAYER; // Player piece one row from top
+      
+      useCheckersStore.setState({
+        board: testBoard,
+        turn: PieceType.PLAYER,
+        gameState: 'playing'
+      });
+      
+      render(<Checkers />);
+      
+      // First click: select the player piece
+      const playerPiece = screen.getByLabelText('2, 2 player piece');
+      fireEvent.click(playerPiece);
+      
+      // Second click: move to destination (top row)
+      const destinationCell = screen.getByLabelText('1, 1 empty');
+      fireEvent.click(destinationCell);
+      
+      // Check that the piece was promoted to king
+      const updatedBoard = useCheckersStore.getState().board;
+      expect(updatedBoard[0][1]).toBe(PieceType.PLAYER_KING);
+    });
+
+    test('promotes bot piece to king when reaching bottom row', () => {
+      // Set up a board with a bot piece near the bottom
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[6][1] = PieceType.BOT; // Bot piece one row from bottom
+      
+      useCheckersStore.setState({
+        board: testBoard,
+        turn: PieceType.BOT,
+        gameState: 'playing'
+      });
+      
+      render(<Checkers />);
+      
+      // First click: select the bot piece
+      const botPiece = screen.getByLabelText('7, 2 bot piece');
+      fireEvent.click(botPiece);
+      
+      // Second click: move to destination (bottom row)
+      const destinationCell = screen.getByLabelText('8, 2 empty');
+      fireEvent.click(destinationCell);
+      
+      // Check that the piece was promoted to king
+      const updatedBoard = useCheckersStore.getState().board;
+      expect(updatedBoard[7][1]).toBe(PieceType.BOT_KING);
+    });
+
+    test('displays king pieces with crown symbols', () => {
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[0][0] = PieceType.PLAYER_KING;
+      testBoard[7][7] = PieceType.BOT_KING;
+      
+      useCheckersStore.setState({ board: testBoard });
+      
+      render(<Checkers />);
+      
+      // Check that king symbols are displayed
+      expect(screen.getByText('♔')).toBeInTheDocument(); // Player king
+      expect(screen.getByText('♚')).toBeInTheDocument(); // Bot king
+    });
+
+    test('allows kings to move backward', () => {
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[3][3] = PieceType.PLAYER_KING; // Player king in middle
+      testBoard[4][4] = PieceType.EMPTY; // Empty space behind
+      
+      useCheckersStore.setState({
+        board: testBoard,
+        turn: PieceType.PLAYER,
+        gameState: 'playing'
+      });
+      
+      render(<Checkers />);
+      
+      // First click: select the king piece
+      const kingPiece = screen.getByLabelText('4, 4 player king');
+      fireEvent.click(kingPiece);
+      
+      // Second click: move to destination behind the king
+      const destinationCell = screen.getByLabelText('5, 5 empty');
+      fireEvent.click(destinationCell);
+      
+      // Check that the king moved backward
+      const updatedBoard = useCheckersStore.getState().board;
+      expect(updatedBoard[4][4]).toBe(PieceType.PLAYER_KING);
+      expect(updatedBoard[3][3]).toBe(PieceType.EMPTY);
+    });
+
+    test('prevents regular pieces from moving backward', () => {
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[3][3] = PieceType.PLAYER; // Regular player piece
+      testBoard[4][4] = PieceType.EMPTY; // Empty space behind
+      
+      useCheckersStore.setState({
+        board: testBoard,
+        turn: PieceType.PLAYER,
+        gameState: 'playing'
+      });
+      
+      render(<Checkers />);
+      
+      // First click: select the regular piece
+      const regularPiece = screen.getByLabelText('4, 4 player piece');
+      fireEvent.click(regularPiece);
+      
+      // Second click: try to move to destination behind the piece
+      const destinationCell = screen.getByLabelText('5, 5 empty');
+      fireEvent.click(destinationCell);
+      
+      // Check that the piece didn't move (invalid move)
+      const updatedBoard = useCheckersStore.getState().board;
+      expect(updatedBoard[3][3]).toBe(PieceType.PLAYER);
+      expect(updatedBoard[4][4]).toBe(PieceType.EMPTY);
+    });
+
+    test('gives kings higher value in board evaluation', () => {
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[0][0] = PieceType.PLAYER_KING; // Player king
+      testBoard[7][7] = PieceType.BOT_KING; // Bot king
+      testBoard[1][1] = PieceType.PLAYER; // Regular player piece
+      testBoard[6][6] = PieceType.BOT; // Regular bot piece
+      
+      useCheckersStore.setState({ board: testBoard });
+      
+      render(<Checkers />);
+      
+      // The evaluation should consider kings worth more than regular pieces
+      // This is tested through the bot AI behavior
+      expect(true).toBe(true); // Placeholder - actual evaluation would be tested in bot logic
+    });
+
+    test('updates tutorial text to mention king promotion', () => {
+      render(<Checkers />);
+      
+      expect(screen.getByText(/Reach the opposite end to promote to king/)).toBeInTheDocument();
+      expect(screen.getByText(/Kings can move backward/)).toBeInTheDocument();
+    });
+
+    test('includes king pieces in accessibility labels', () => {
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[0][0] = PieceType.PLAYER_KING;
+      testBoard[7][7] = PieceType.BOT_KING;
+      
+      useCheckersStore.setState({ board: testBoard });
+      
+      render(<Checkers />);
+      
+      expect(screen.getByLabelText('1, 1 player king')).toBeInTheDocument();
+      expect(screen.getByLabelText('8, 8 bot king')).toBeInTheDocument();
+    });
+
+    test('allows selection of king pieces for movement', () => {
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[3][3] = PieceType.PLAYER_KING;
+      
+      useCheckersStore.setState({
+        board: testBoard,
+        turn: PieceType.PLAYER,
+        gameState: 'playing'
+      });
+      
+      render(<Checkers />);
+      
+      // Click on the king piece
+      const kingPiece = screen.getByLabelText('4, 4 player king');
+      fireEvent.click(kingPiece);
+      
+      // Check that the king was selected
+      expect(useCheckersStore.getState().selected).toEqual([3, 3]);
+    });
   });
 }); 

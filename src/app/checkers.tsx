@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { useCheckersStore, PlayerType, Board, BotDifficulty, GameMode } from './checkersStore';
+import { useCheckersStore, PieceType, Board, BotDifficulty, GameMode, isKing, isPlayerPiece, isBotPiece, promoteToKing } from './checkersStore';
 import Tutorial from './components/Tutorial';
 import { checkersTutorial } from './data/tutorials';
 
@@ -59,8 +59,8 @@ export default function Checkers() {
   const [showTutorial, setShowTutorial] = React.useState(false);
 
   function checkGameState(board: Board): string {
-    const playerPieces = board.flat().filter(cell => cell === PlayerType.PLAYER).length;
-    const botPieces = board.flat().filter(cell => cell === PlayerType.BOT).length;
+    const playerPieces = board.flat().filter(cell => cell === PieceType.PLAYER).length;
+    const botPieces = board.flat().filter(cell => cell === PieceType.BOT).length;
     if (playerPieces === 0) return 'lose';
     if (botPieces === 0) return 'win';
     return 'playing';
@@ -72,13 +72,13 @@ export default function Checkers() {
     // In human vs human mode, allow both players to move their pieces
     // In human vs bot mode, only allow player to move
     const canMovePiece = gameMode === GameMode.HUMAN_VS_HUMAN ? 
-      (turn === PlayerType.PLAYER && board[y][x] === PlayerType.PLAYER) || 
-      (turn === PlayerType.BOT && board[y][x] === PlayerType.BOT) :
-      (turn === PlayerType.PLAYER && board[y][x] === PlayerType.PLAYER);
+      (turn === PieceType.PLAYER && (board[y][x] === PieceType.PLAYER || board[y][x] === PieceType.PLAYER_KING)) || 
+      (turn === PieceType.BOT && (board[y][x] === PieceType.BOT || board[y][x] === PieceType.BOT_KING)) :
+      (turn === PieceType.PLAYER && (board[y][x] === PieceType.PLAYER || board[y][x] === PieceType.PLAYER_KING));
     
     if (selected) {
       const [sy, sx] = selected;
-      const currentPlayer = turn === PlayerType.PLAYER ? PlayerType.PLAYER : PlayerType.BOT;
+      const currentPlayer = turn === PieceType.PLAYER ? PieceType.PLAYER : PieceType.BOT;
       if (isValidMove(board, sy, sx, y, x, currentPlayer)) {
         const newBoard = movePiece(board, sy, sx, y, x);
         setBoard(newBoard);
@@ -88,9 +88,9 @@ export default function Checkers() {
         const newGameState = checkGameState(newBoard);
         setGameState(newGameState);
         if (newGameState === 'playing') {
-          setTurn(turn === PlayerType.PLAYER ? PlayerType.BOT : PlayerType.PLAYER);
+          setTurn(turn === PieceType.PLAYER ? PieceType.BOT : PieceType.PLAYER);
           // Bot move after player move (only in HUMAN_VS_BOT mode)
-          if (gameMode === GameMode.HUMAN_VS_BOT && turn === PlayerType.PLAYER) {
+          if (gameMode === GameMode.HUMAN_VS_BOT && turn === PieceType.PLAYER) {
             setTimeout(() => botMove(newBoard), 500);
           }
         } else {
@@ -105,19 +105,26 @@ export default function Checkers() {
     }
   }
 
-  function getValidMoves(board: Board, player: PlayerType): Array<[number, number, number, number]> {
+  function getValidMoves(board: Board, player: PieceType): Array<[number, number, number, number]> {
     const moves: Array<[number, number, number, number]> = [];
     for (let y = 0; y < BOARD_SIZE; y++) {
       for (let x = 0; x < BOARD_SIZE; x++) {
-        if (board[y][x] === player) {
-          const dir = player === PlayerType.PLAYER ? -1 : 1;
-          const ny = y + dir;
-          if (ny >= 0 && ny < BOARD_SIZE) {
-            if (x - 1 >= 0 && board[ny][x - 1] === PlayerType.EMPTY) {
-              moves.push([y, x, ny, x - 1]);
-            }
-            if (x + 1 < BOARD_SIZE && board[ny][x + 1] === PlayerType.EMPTY) {
-              moves.push([y, x, ny, x + 1]);
+        const piece = board[y][x];
+        if (piece === player || (player === PieceType.PLAYER && piece === PieceType.PLAYER_KING) || (player === PieceType.BOT && piece === PieceType.BOT_KING)) {
+          const isKingPiece = isKing(piece);
+          
+          // Define possible directions
+          const directions = isKingPiece ? [-1, 1] : [player === PieceType.PLAYER ? -1 : 1];
+          
+          for (const dir of directions) {
+            const ny = y + dir;
+            if (ny >= 0 && ny < BOARD_SIZE) {
+              if (x - 1 >= 0 && board[ny][x - 1] === PieceType.EMPTY) {
+                moves.push([y, x, ny, x - 1]);
+              }
+              if (x + 1 < BOARD_SIZE && board[ny][x + 1] === PieceType.EMPTY) {
+                moves.push([y, x, ny, x + 1]);
+              }
             }
           }
         }
@@ -130,10 +137,15 @@ export default function Checkers() {
     let score = 0;
     for (let y = 0; y < BOARD_SIZE; y++) {
       for (let x = 0; x < BOARD_SIZE; x++) {
-        if (board[y][x] === PlayerType.BOT) {
+        const piece = board[y][x];
+        if (piece === PieceType.BOT) {
           score += 1;
-        } else if (board[y][x] === PlayerType.PLAYER) {
+        } else if (piece === PieceType.BOT_KING) {
+          score += 2; // Kings are worth more
+        } else if (piece === PieceType.PLAYER) {
           score -= 1;
+        } else if (piece === PieceType.PLAYER_KING) {
+          score -= 2; // Kings are worth more
         }
       }
     }
@@ -141,10 +153,10 @@ export default function Checkers() {
   }
 
   function botMoveEasy(currentBoard: Board) {
-    const moves = getValidMoves(currentBoard, PlayerType.BOT);
+    const moves = getValidMoves(currentBoard, PieceType.BOT);
     if (moves.length === 0) {
       setMessage('Bot cannot move. Your turn!');
-      setTurn(PlayerType.PLAYER);
+      setTurn(PieceType.PLAYER);
       return;
     }
     const randomMove = moves[Math.floor(Math.random() * moves.length)];
@@ -156,7 +168,7 @@ export default function Checkers() {
     const newGameState = checkGameState(newBoard);
     setGameState(newGameState);
     if (newGameState === 'playing') {
-      setTurn(PlayerType.PLAYER);
+      setTurn(PieceType.PLAYER);
       setMessage('Your move!');
     } else {
       updateStats(newGameState === 'win' ? 'win' : 'loss');
@@ -165,10 +177,10 @@ export default function Checkers() {
   }
 
   function botMoveMedium(currentBoard: Board) {
-    const moves = getValidMoves(currentBoard, PlayerType.BOT);
+    const moves = getValidMoves(currentBoard, PieceType.BOT);
     if (moves.length === 0) {
       setMessage('Bot cannot move. Your turn!');
-      setTurn(PlayerType.PLAYER);
+      setTurn(PieceType.PLAYER);
       return;
     }
     
@@ -197,7 +209,7 @@ export default function Checkers() {
     const newGameState = checkGameState(newBoard);
     setGameState(newGameState);
     if (newGameState === 'playing') {
-      setTurn(PlayerType.PLAYER);
+      setTurn(PieceType.PLAYER);
       setMessage('Your move!');
     } else {
       updateStats(newGameState === 'win' ? 'win' : 'loss');
@@ -206,10 +218,10 @@ export default function Checkers() {
   }
 
   function botMoveHard(currentBoard: Board) {
-    const moves = getValidMoves(currentBoard, PlayerType.BOT);
+    const moves = getValidMoves(currentBoard, PieceType.BOT);
     if (moves.length === 0) {
       setMessage('Bot cannot move. Your turn!');
-      setTurn(PlayerType.PLAYER);
+      setTurn(PieceType.PLAYER);
       return;
     }
     
@@ -222,7 +234,7 @@ export default function Checkers() {
       let score = evaluateBoard(newBoard);
       
       // Simulate player's best response
-      const playerMoves = getValidMoves(newBoard, PlayerType.PLAYER);
+      const playerMoves = getValidMoves(newBoard, PieceType.PLAYER);
       if (playerMoves.length > 0) {
         let worstPlayerScore = Infinity;
         for (const [psy, psx, pdy, pdx] of playerMoves) {
@@ -247,7 +259,7 @@ export default function Checkers() {
     const newGameState = checkGameState(newBoard);
     setGameState(newGameState);
     if (newGameState === 'playing') {
-      setTurn(PlayerType.PLAYER);
+      setTurn(PieceType.PLAYER);
       setMessage('Your move!');
     } else {
       updateStats(newGameState === 'win' ? 'win' : 'loss');
@@ -269,16 +281,46 @@ export default function Checkers() {
     }
   }
 
-  function isValidMove(board: Board, sy: number, sx: number, dy: number, dx: number, player: PlayerType): boolean {
-    if (board[dy][dx] !== PlayerType.EMPTY) return false;
-    const dir = player === PlayerType.PLAYER ? -1 : 1;
-    return (dy - sy === dir) && (Math.abs(dx - sx) === 1);
+  function isValidMove(board: Board, sy: number, sx: number, dy: number, dx: number, player: PieceType): boolean {
+    if (board[dy][dx] !== PieceType.EMPTY) return false;
+    
+    const piece = board[sy][sx];
+    const isKingPiece = isKing(piece);
+    
+    // Calculate direction
+    const yDiff = dy - sy;
+    const xDiff = Math.abs(dx - sx);
+    
+    // Must move diagonally
+    if (xDiff !== Math.abs(yDiff)) return false;
+    
+    // Regular pieces can only move forward
+    if (!isKingPiece) {
+      const dir = player === PieceType.PLAYER ? -1 : 1;
+      if (yDiff !== dir) return false;
+    }
+    
+    // Kings can move in any diagonal direction
+    return true;
   }
 
   function movePiece(board: Board, sy: number, sx: number, dy: number, dx: number): Board {
     const newBoard = clone(board);
-    newBoard[dy][dx] = newBoard[sy][sx];
-    newBoard[sy][sx] = PlayerType.EMPTY;
+    const piece = newBoard[sy][sx];
+    
+    // Move the piece
+    newBoard[dy][dx] = piece;
+    newBoard[sy][sx] = PieceType.EMPTY;
+    
+    // Check for king promotion
+    if (isPlayerPiece(piece) && dy === 0) {
+      // Player piece reached the top row
+      newBoard[dy][dx] = promoteToKing(piece);
+    } else if (isBotPiece(piece) && dy === BOARD_SIZE - 1) {
+      // Bot piece reached the bottom row
+      newBoard[dy][dx] = promoteToKing(piece);
+    }
+    
     return newBoard;
   }
 
@@ -307,7 +349,7 @@ export default function Checkers() {
   }
 
   function handleKeyDown(event: React.KeyboardEvent) {
-    if (turn !== PlayerType.PLAYER || gameState !== 'playing') return;
+    if (turn !== PieceType.PLAYER || gameState !== 'playing') return;
     
     const [y, x] = keyboardFocus;
     let newY = y;
@@ -393,7 +435,7 @@ export default function Checkers() {
       
       {/* Tutorial Section */}
       <div style={{ background: '#333', padding: 12, borderRadius: 8, marginBottom: 16 }}>
-        <strong>How to Play:</strong> Move your pieces diagonally forward. Capture opponent pieces by jumping over them. First to lose all pieces loses the game.
+        <strong>How to Play:</strong> Move your pieces diagonally forward. Capture opponent pieces by jumping over them. Reach the opposite end to promote to king. Kings can move backward. First to lose all pieces loses the game.
         <button
           onClick={() => setShowTutorial(true)}
           style={{ marginLeft: 16, background: '#059669', color: 'white', border: 'none', borderRadius: 4, padding: '4px 12px', cursor: 'pointer' }}
@@ -461,14 +503,14 @@ export default function Checkers() {
       <div style={{ marginBottom: 16 }}>
         <button 
           onClick={handleUndo} 
-          disabled={historyIndex === 0 || turn !== PlayerType.PLAYER}
+          disabled={historyIndex === 0 || turn !== PieceType.PLAYER}
           style={{ marginRight: 8, background: '#6366f1', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 4, cursor: 'pointer' }}
         >
           ↩ Undo
         </button>
         <button 
           onClick={handleRedo} 
-          disabled={historyIndex === history.length - 1 || turn !== PlayerType.PLAYER}
+          disabled={historyIndex === history.length - 1 || turn !== PieceType.PLAYER}
           style={{ background: '#6366f1', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 4, cursor: 'pointer' }}
         >
           ↪ Redo
@@ -484,7 +526,7 @@ export default function Checkers() {
                 highlight = true;
               }
               const isKeyboardFocused = keyboardFocus[0] === y && keyboardFocus[1] === x;
-              const isValidMoveTarget = selected && isValidMove(board, selected[0], selected[1], y, x, PlayerType.PLAYER);
+              const isValidMoveTarget = selected && isValidMove(board, selected[0], selected[1], y, x, PieceType.PLAYER);
               
               return (
                 <div
@@ -493,7 +535,7 @@ export default function Checkers() {
                   onFocus={() => setKeyboardFocus([y, x])}
                   tabIndex={0}
                   role="button"
-                  aria-label={`${y + 1}, ${x + 1} ${cell === PlayerType.PLAYER ? 'player piece' : cell === PlayerType.BOT ? 'bot piece' : 'empty'}`}
+                  aria-label={`${y + 1}, ${x + 1} ${cell === PieceType.PLAYER ? 'player piece' : cell === PieceType.BOT ? 'bot piece' : cell === PieceType.PLAYER_KING ? 'player king' : cell === PieceType.BOT_KING ? 'bot king' : 'empty'}`}
                   style={{
                     ...cellStyle,
                     background: highlight ? '#fbbf24' : 
@@ -502,7 +544,7 @@ export default function Checkers() {
                     color: (y + x) % 2 === 0 ? 'white' : 'black',
                     border: selected && selected[0] === y && selected[1] === x ? '2px solid #fbbf24' : 
                            isKeyboardFocused ? '2px solid #3b82f6' : '1px solid #333',
-                    cursor: turn === PlayerType.PLAYER && (cell === PlayerType.PLAYER || isValidMoveTarget) ? 'pointer' : 'default',
+                    cursor: turn === PieceType.PLAYER && (cell === PieceType.PLAYER || cell === PieceType.PLAYER_KING || isValidMoveTarget) ? 'pointer' : 'default',
                     outline: 'none',
                     transform: selected && selected[0] === y && selected[1] === x ? 'scale(1.1)' : 'scale(1)',
                     boxShadow: highlight ? '0 0 10px rgba(251, 191, 36, 0.5)' : 'none',
@@ -510,10 +552,15 @@ export default function Checkers() {
                 >
                   <span style={{
                     ...pieceStyle,
-                    transform: cell === PlayerType.PLAYER || cell === PlayerType.BOT ? 'scale(1)' : 'scale(0)',
-                    opacity: cell === PlayerType.PLAYER || cell === PlayerType.BOT ? 1 : 0,
+                    transform: cell === PieceType.PLAYER || cell === PieceType.BOT || cell === PieceType.PLAYER_KING || cell === PieceType.BOT_KING ? 'scale(1)' : 'scale(0)',
+                    opacity: cell === PieceType.PLAYER || cell === PieceType.BOT || cell === PieceType.PLAYER_KING || cell === PieceType.BOT_KING ? 1 : 0,
+                    fontSize: isKing(cell) ? '20px' : '16px',
+                    fontWeight: isKing(cell) ? 'bold' : 'normal',
                   }}>
-                    {cell === PlayerType.PLAYER ? '●' : cell === PlayerType.BOT ? '○' : ''}
+                    {cell === PieceType.PLAYER ? '●' : 
+                     cell === PieceType.BOT ? '○' : 
+                     cell === PieceType.PLAYER_KING ? '♔' : 
+                     cell === PieceType.BOT_KING ? '♚' : ''}
                   </span>
                 </div>
               );

@@ -1,9 +1,11 @@
 import { create } from 'zustand';
 
-export enum PlayerType {
+export enum PieceType {
   EMPTY = 0,
   PLAYER = 1,
   BOT = 2,
+  PLAYER_KING = 3,
+  BOT_KING = 4,
 }
 
 export enum PlayerColor {
@@ -22,21 +24,41 @@ export enum GameMode {
   HUMAN_VS_HUMAN = 'human_vs_human',
 }
 
-export type Cell = PlayerType;
+export type Cell = PieceType;
 export type Board = Cell[][];
 export type Pos = [number, number] | null;
+
+export { isKing, isPlayerPiece, isBotPiece, promoteToKing };
 
 const BOARD_SIZE = 8;
 
 function initialBoard(): Board {
-  const board: Board = Array.from({ length: BOARD_SIZE }, () => Array<Cell>(BOARD_SIZE).fill(PlayerType.EMPTY));
-  for (let y = 0; y < 3; y++) for (let x = (y + 1) % 2; x < BOARD_SIZE; x += 2) board[y][x] = PlayerType.BOT;
-  for (let y = BOARD_SIZE - 3; y < BOARD_SIZE; y++) for (let x = (y + 1) % 2; x < BOARD_SIZE; x += 2) board[y][x] = PlayerType.PLAYER;
+  const board: Board = Array.from({ length: BOARD_SIZE }, () => Array<Cell>(BOARD_SIZE).fill(PieceType.EMPTY));
+  for (let y = 0; y < 3; y++) for (let x = (y + 1) % 2; x < BOARD_SIZE; x += 2) board[y][x] = PieceType.BOT;
+  for (let y = BOARD_SIZE - 3; y < BOARD_SIZE; y++) for (let x = (y + 1) % 2; x < BOARD_SIZE; x += 2) board[y][x] = PieceType.PLAYER;
   return board;
 }
 
 function clone(board: Board): Board {
   return board.map(row => [...row]);
+}
+
+function isKing(piece: PieceType): boolean {
+  return piece === PieceType.PLAYER_KING || piece === PieceType.BOT_KING;
+}
+
+function isPlayerPiece(piece: PieceType): boolean {
+  return piece === PieceType.PLAYER || piece === PieceType.PLAYER_KING;
+}
+
+function isBotPiece(piece: PieceType): boolean {
+  return piece === PieceType.BOT || piece === PieceType.BOT_KING;
+}
+
+function promoteToKing(piece: PieceType): PieceType {
+  if (piece === PieceType.PLAYER) return PieceType.PLAYER_KING;
+  if (piece === PieceType.BOT) return PieceType.BOT_KING;
+  return piece; // Already a king or empty
 }
 
 interface GameStats {
@@ -48,7 +70,7 @@ interface GameStats {
 interface CheckersState {
   board: Board;
   selected: Pos;
-  turn: PlayerType;
+  turn: PieceType;
   message: string;
   gameState: string;
   history: Board[];
@@ -58,7 +80,7 @@ interface CheckersState {
   gameMode: GameMode;
   setBoard: (b: Board) => void;
   setSelected: (p: Pos) => void;
-  setTurn: (t: PlayerType) => void;
+  setTurn: (t: PieceType) => void;
   setMessage: (m: string) => void;
   setGameState: (s: string) => void;
   resetGame: () => void;
@@ -120,7 +142,7 @@ export const useCheckersStore = create<CheckersState>((set, get) => {
   const savedState = loadGameState();
   const initialState = savedState || {
     board: initialBoard(),
-    turn: PlayerType.PLAYER,
+    turn: PieceType.PLAYER,
     gameState: 'playing',
     history: [initialBoard()],
     historyIndex: 0,
@@ -148,7 +170,7 @@ export const useCheckersStore = create<CheckersState>((set, get) => {
       const newState = {
         board: initialBoard(),
         selected: null,
-        turn: PlayerType.PLAYER,
+        turn: PieceType.PLAYER,
         message: 'Your move!',
         gameState: 'playing',
         history: [initialBoard()],
