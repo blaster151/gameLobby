@@ -494,14 +494,15 @@ export default function Chess() {
         // Check for game end after player move
         const gameOverResult = isGameOver(newBoard, false); // Black's turn now
         if (gameOverResult.isOver) {
+          const moveCount = history.length - 1; // Subtract initial board state
           if (gameOverResult.result === 'win') {
             setGameState('won');
             setMessage('Checkmate! White wins!');
-            updateStats('win');
+            updateStats('win', moveCount);
           } else if (gameOverResult.result === 'loss') {
             setGameState('lost');
             setMessage('Checkmate! Black wins!');
-            updateStats('loss');
+            updateStats('loss', moveCount);
           } else if (gameOverResult.result === 'stalemate') {
             setGameState('draw');
             setMessage('Stalemate! Game is a draw.');
@@ -531,14 +532,15 @@ export default function Chess() {
                   // Check for game end after bot move
                   const botGameOverResult = isGameOver(botBoard, true); // White's turn now
                   if (botGameOverResult.isOver) {
+                    const botMoveCount = useChessStore.getState().history.length - 1;
                     if (botGameOverResult.result === 'win') {
                       useChessStore.getState().setGameState('won');
                       useChessStore.getState().setMessage('Checkmate! White wins!');
-                      useChessStore.getState().updateStats('win');
+                      useChessStore.getState().updateStats('win', botMoveCount);
                     } else if (botGameOverResult.result === 'loss') {
                       useChessStore.getState().setGameState('lost');
                       useChessStore.getState().setMessage('Checkmate! Black wins!');
-                      useChessStore.getState().updateStats('loss');
+                      useChessStore.getState().updateStats('loss', botMoveCount);
                     } else if (botGameOverResult.result === 'stalemate') {
                       useChessStore.getState().setGameState('draw');
                       useChessStore.getState().setMessage('Stalemate! Game is a draw.');
@@ -618,14 +620,15 @@ export default function Chess() {
     // Continue with game logic
     const gameOverResult = isGameOver(newBoard, false); // Black's turn now
     if (gameOverResult.isOver) {
+      const moveCount = history.length - 1;
       if (gameOverResult.result === 'win') {
         setGameState('won');
         setMessage('Checkmate! White wins!');
-        updateStats('win');
+        updateStats('win', moveCount);
       } else if (gameOverResult.result === 'loss') {
         setGameState('lost');
         setMessage('Checkmate! Black wins!');
-        updateStats('loss');
+        updateStats('loss', moveCount);
       } else if (gameOverResult.result === 'stalemate') {
         setGameState('draw');
         setMessage('Stalemate! Game is a draw.');
@@ -655,14 +658,15 @@ export default function Chess() {
               // Check for game end after bot move
               const botGameOverResult = isGameOver(botBoard, true); // White's turn now
               if (botGameOverResult.isOver) {
+                const botMoveCount = useChessStore.getState().history.length - 1;
                 if (botGameOverResult.result === 'win') {
                   useChessStore.getState().setGameState('won');
                   useChessStore.getState().setMessage('Checkmate! White wins!');
-                  useChessStore.getState().updateStats('win');
+                  useChessStore.getState().updateStats('win', botMoveCount);
                 } else if (botGameOverResult.result === 'loss') {
                   useChessStore.getState().setGameState('lost');
                   useChessStore.getState().setMessage('Checkmate! Black wins!');
-                  useChessStore.getState().updateStats('loss');
+                  useChessStore.getState().updateStats('loss', botMoveCount);
                 } else if (botGameOverResult.result === 'stalemate') {
                   useChessStore.getState().setGameState('draw');
                   useChessStore.getState().setMessage('Stalemate! Game is a draw.');
@@ -720,8 +724,16 @@ export default function Chess() {
         <strong>Game Statistics:</strong> Wins: {stats.wins} | Losses: {stats.losses} | Total Games: {stats.totalGames}
         {stats.totalGames > 0 && (
           <span style={{ marginLeft: 12 }}>
-            Win Rate: {Math.round((stats.wins / stats.totalGames) * 100)}%
+            Win Rate: {Math.round((stats.wins / stats.totalGames) * 100)}% | 
+            Current Streak: {stats.currentWinStreak} | 
+            Best Streak: {stats.bestWinStreak} | 
+            Avg Moves: {stats.averageMovesPerGame}
           </span>
+        )}
+        {stats.fastestWin > 0 && (
+          <div style={{ marginTop: 8, fontSize: '0.9em' }}>
+            Fastest Win: {stats.fastestWin} moves | Longest Game: {stats.longestGame} moves
+          </div>
         )}
         <button
           onClick={resetStats}

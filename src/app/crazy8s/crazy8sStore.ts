@@ -23,6 +23,11 @@ export enum Rank {
   KING = 13,
 }
 
+export enum GameMode {
+  HUMAN_VS_BOT = 'human_vs_bot',
+  HUMAN_VS_HUMAN = 'human_vs_human',
+}
+
 export interface Card {
   suit: Suit;
   rank: Rank;
@@ -187,6 +192,7 @@ function saveGameState(state: any) {
       turn: state.turn,
       message: state.message,
       botDifficulty: state.botDifficulty,
+      gameMode: state.gameMode,
     }));
   }
 }
@@ -214,6 +220,7 @@ interface Crazy8sState {
   message: string;
   stats: GameStats;
   botDifficulty: BotDifficulty;
+  gameMode: GameMode;
   setPlayerHand: (hand: Card[]) => void;
   setBotHand: (hand: Card[]) => void;
   setStockPile: (pile: Card[]) => void;
@@ -226,6 +233,7 @@ interface Crazy8sState {
   updateStats: (result: 'win' | 'loss') => void;
   resetStats: () => void;
   setBotDifficulty: (difficulty: BotDifficulty) => void;
+  setGameMode: (mode: GameMode) => void;
   saveGame: () => void;
   loadGame: () => void;
   hasSavedGame: () => boolean;
@@ -245,6 +253,7 @@ export const useCrazy8sStore = create<Crazy8sState>((set, get) => {
     turn: 'player' as const,
     message: 'Dealing cards...',
     botDifficulty: BotDifficulty.MEDIUM,
+    gameMode: GameMode.HUMAN_VS_BOT,
   };
 
   return {
@@ -258,6 +267,7 @@ export const useCrazy8sStore = create<Crazy8sState>((set, get) => {
     message: initialState.message,
     stats: typeof window !== 'undefined' ? loadStats() : { wins: 0, losses: 0, totalGames: 0 },
     botDifficulty: initialState.botDifficulty,
+    gameMode: initialState.gameMode,
     
     setPlayerHand: (hand) => set({ playerHand: hand }),
     setBotHand: (hand) => set({ botHand: hand }),
@@ -281,6 +291,7 @@ export const useCrazy8sStore = create<Crazy8sState>((set, get) => {
         gameState: GameState.PLAYING,
         turn: 'player',
         message: 'Your turn. Play a card or draw from the deck.',
+        gameMode: get().gameMode,
       });
     },
     
@@ -304,6 +315,8 @@ export const useCrazy8sStore = create<Crazy8sState>((set, get) => {
     
     setBotDifficulty: (difficulty) => set({ botDifficulty: difficulty }),
     
+    setGameMode: (mode) => set({ gameMode: mode }),
+    
     saveGame: () => {
       const state = get();
       saveGameState(state);
@@ -322,6 +335,7 @@ export const useCrazy8sStore = create<Crazy8sState>((set, get) => {
           turn: savedState.turn,
           message: savedState.message,
           botDifficulty: savedState.botDifficulty,
+          gameMode: savedState.gameMode || GameMode.HUMAN_VS_BOT,
         });
       }
     },
@@ -331,7 +345,7 @@ export const useCrazy8sStore = create<Crazy8sState>((set, get) => {
     },
     
     playCard: (card, newSuit) => {
-      const { playerHand, topCard, currentSuit, turn, gameState, botDifficulty } = get();
+      const { playerHand, topCard, currentSuit, turn, gameState, botDifficulty, gameMode } = get();
       if (gameState !== GameState.PLAYING || turn !== 'player') return;
       
       if (!topCard) return;
@@ -350,7 +364,7 @@ export const useCrazy8sStore = create<Crazy8sState>((set, get) => {
         topCard: newTopCard,
         currentSuit: newCurrentSuit,
         turn: 'bot',
-        message: 'Bot is thinking...',
+        message: gameMode === GameMode.HUMAN_VS_BOT ? 'Bot is thinking...' : 'Player 2\'s turn',
       });
       
       // Check for win
@@ -363,62 +377,63 @@ export const useCrazy8sStore = create<Crazy8sState>((set, get) => {
         return;
       }
       
-      // Bot turn
-      setTimeout(() => {
-        const currentState = get();
-        if (currentState.turn === 'bot' && currentState.gameState === GameState.PLAYING) {
-          const botMove = makeBotMove(
-            currentState.botHand,
-            currentState.topCard!,
-            currentState.currentSuit,
-            currentState.stockPile,
-            currentState.botDifficulty
-          );
-          
-          if (botMove.action === 'play' && botMove.card) {
-            const newBotHand = currentState.botHand.filter(c => c.id !== botMove.card!.id);
-            const newTopCard = botMove.card;
-            const newCurrentSuit = botMove.card.rank === Rank.EIGHT ? botMove.newSuit : undefined;
+      // Bot turn only in human vs bot mode
+      if (gameMode === GameMode.HUMAN_VS_BOT) {
+        setTimeout(() => {
+          const currentState = get();
+          if (currentState.turn === 'bot' && currentState.gameState === GameState.PLAYING) {
+            const botMove = makeBotMove(
+              currentState.botHand,
+              currentState.topCard!,
+              currentState.currentSuit,
+              currentState.stockPile,
+              currentState.botDifficulty
+            );
             
-            set({
-              botHand: newBotHand,
-              topCard: newTopCard,
-              currentSuit: newCurrentSuit,
-              turn: 'player',
-              message: 'Your turn. Play a card or draw from the deck.',
-            });
-            
-            // Check for bot win
-            if (newBotHand.length === 0) {
-              set({ 
-                gameState: GameState.GAME_OVER, 
-                message: 'Bot wins! Bot played all cards!',
-              });
-              get().updateStats('loss');
-            }
-          } else {
-            // Bot draws
-            if (currentState.stockPile.length > 0) {
-              const newStockPile = [...currentState.stockPile];
-              const drawnCard = newStockPile.pop()!;
-              const newBotHand = [...currentState.botHand, drawnCard];
+            if (botMove.action === 'play' && botMove.card) {
+              const newBotHand = currentState.botHand.filter(c => c.id !== botMove.card!.id);
+              const newTopCard = botMove.card;
+              const newCurrentSuit = botMove.card.rank === Rank.EIGHT ? botMove.newSuit : undefined;
               
               set({
-                stockPile: newStockPile,
                 botHand: newBotHand,
+                topCard: newTopCard,
+                currentSuit: newCurrentSuit,
                 turn: 'player',
-                message: 'Bot drew a card. Your turn.',
+                message: 'Your turn. Play a card or draw from the deck.',
               });
+              
+              // Check for bot win
+              if (newBotHand.length === 0) {
+                set({ 
+                  gameState: GameState.GAME_OVER, 
+                  message: 'Bot wins! Bot played all cards!',
+                });
+                get().updateStats('loss');
+              }
             } else {
-              // No cards left to draw
-              set({ 
-                gameState: GameState.GAME_OVER, 
-                message: 'No cards left to draw. Game is a draw!',
-              });
+              // Bot draws
+              if (currentState.stockPile.length > 0) {
+                const newStockPile = [...currentState.stockPile];
+                const drawnCard = newStockPile.pop()!;
+                const newBotHand = [...currentState.botHand, drawnCard];
+                
+                set({
+                  stockPile: newStockPile,
+                  botHand: newBotHand,
+                  turn: 'player',
+                  message: 'Bot drew a card. Your turn.',
+                });
+              } else {
+                set({
+                  turn: 'player',
+                  message: 'Bot has no valid moves. Your turn.',
+                });
+              }
             }
           }
-        }
-      }, 1000);
+        }, 1000);
+      }
     },
     
     drawCard: () => {

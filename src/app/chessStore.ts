@@ -66,6 +66,13 @@ interface GameStats {
   wins: number;
   losses: number;
   totalGames: number;
+  currentWinStreak: number;
+  bestWinStreak: number;
+  averageMovesPerGame: number;
+  totalMoves: number;
+  fastestWin: number; // in moves
+  longestGame: number; // in moves
+  lastGameDate: string | null;
 }
 
 function loadStats(): GameStats {
@@ -73,11 +80,36 @@ function loadStats(): GameStats {
     const raw = localStorage.getItem('chessStats');
     if (raw) {
       try {
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        // Handle migration from old stats format
+        if (!parsed.currentWinStreak) {
+          return {
+            ...parsed,
+            currentWinStreak: 0,
+            bestWinStreak: 0,
+            averageMovesPerGame: 0,
+            totalMoves: 0,
+            fastestWin: 0,
+            longestGame: 0,
+            lastGameDate: null,
+          };
+        }
+        return parsed;
       } catch {}
     }
   }
-  return { wins: 0, losses: 0, totalGames: 0 };
+  return { 
+    wins: 0, 
+    losses: 0, 
+    totalGames: 0, 
+    currentWinStreak: 0,
+    bestWinStreak: 0,
+    averageMovesPerGame: 0,
+    totalMoves: 0,
+    fastestWin: 0,
+    longestGame: 0,
+    lastGameDate: null,
+  };
 }
 
 function saveStats(stats: GameStats) {
@@ -135,7 +167,7 @@ interface ChessState {
   resetGame: () => void;
   pushHistory: (b: Board) => void;
   stepHistory: (dir: 1 | -1) => void;
-  updateStats: (result: 'win' | 'loss') => void;
+  updateStats: (result: 'win' | 'loss', moveCount?: number) => void;
   resetStats: () => void;
   setBotDifficulty: (difficulty: BotDifficulty) => void;
   setGameMode: (mode: GameMode) => void;
@@ -164,7 +196,18 @@ export const useChessStore = create<ChessState>((set, get) => {
     gameState: initialState.gameState,
     history: initialState.history,
     historyIndex: initialState.historyIndex,
-    stats: typeof window !== 'undefined' ? loadStats() : { wins: 0, losses: 0, totalGames: 0 },
+    stats: typeof window !== 'undefined' ? loadStats() : { 
+      wins: 0, 
+      losses: 0, 
+      totalGames: 0, 
+      currentWinStreak: 0,
+      bestWinStreak: 0,
+      averageMovesPerGame: 0,
+      totalMoves: 0,
+      fastestWin: 0,
+      longestGame: 0,
+      lastGameDate: null,
+    },
     botDifficulty: initialState.botDifficulty,
     gameMode: initialState.gameMode,
     lastMove: null,
@@ -203,19 +246,43 @@ export const useChessStore = create<ChessState>((set, get) => {
       set({ historyIndex: newIndex });
       setBoard(clone(history[newIndex]));
     },
-    updateStats: (result) => {
+    updateStats: (result, moveCount = 0) => {
       const { stats } = get();
+      const isWin = result === 'win';
+      const newWinStreak = isWin ? stats.currentWinStreak + 1 : 0;
+      const newBestStreak = Math.max(stats.bestWinStreak, newWinStreak);
+      const newTotalMoves = stats.totalMoves + moveCount;
+      const newTotalGames = stats.totalGames + 1;
+      
       const newStats = {
         ...stats,
-        totalGames: stats.totalGames + 1,
-        wins: result === 'win' ? stats.wins + 1 : stats.wins,
+        totalGames: newTotalGames,
+        wins: isWin ? stats.wins + 1 : stats.wins,
         losses: result === 'loss' ? stats.losses + 1 : stats.losses,
+        currentWinStreak: newWinStreak,
+        bestWinStreak: newBestStreak,
+        totalMoves: newTotalMoves,
+        averageMovesPerGame: newTotalGames > 0 ? Math.round(newTotalMoves / newTotalGames) : 0,
+        fastestWin: isWin && (stats.fastestWin === 0 || moveCount < stats.fastestWin) ? moveCount : stats.fastestWin,
+        longestGame: moveCount > stats.longestGame ? moveCount : stats.longestGame,
+        lastGameDate: new Date().toISOString(),
       };
       set({ stats: newStats });
       saveStats(newStats);
     },
     resetStats: () => {
-      const zeroStats = { wins: 0, losses: 0, totalGames: 0 };
+      const zeroStats = { 
+        wins: 0, 
+        losses: 0, 
+        totalGames: 0, 
+        currentWinStreak: 0,
+        bestWinStreak: 0,
+        averageMovesPerGame: 0,
+        totalMoves: 0,
+        fastestWin: 0,
+        longestGame: 0,
+        lastGameDate: null,
+      };
       set({ stats: zeroStats });
       saveStats(zeroStats);
     },

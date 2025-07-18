@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useCrazy8sStore, Suit, Rank, Card, GameState, BotDifficulty } from './crazy8sStore';
-import Tutorial from './components/Tutorial';
-import { crazy8sTutorial } from './data/tutorials';
+import { useCrazy8sStore, Card, Suit, Rank, GameMode, GameState, BotDifficulty } from './crazy8sStore';
+import Tutorial from '../components/Tutorial';
+import { crazy8sTutorial } from '../data/tutorials';
 
 function getCardDisplay(card: Card): { symbol: string; color: string } {
   const rankSymbols: { [key in Rank]: string } = {
@@ -61,10 +61,12 @@ export default function Crazy8s() {
   const message = useCrazy8sStore(s => s.message);
   const stats = useCrazy8sStore(s => s.stats);
   const botDifficulty = useCrazy8sStore(s => s.botDifficulty);
+  const gameMode = useCrazy8sStore(s => s.gameMode);
   const resetGame = useCrazy8sStore(s => s.resetGame);
   const updateStats = useCrazy8sStore(s => s.updateStats);
   const resetStats = useCrazy8sStore(s => s.resetStats);
   const setBotDifficulty = useCrazy8sStore(s => s.setBotDifficulty);
+  const setGameMode = useCrazy8sStore(s => s.setGameMode);
   const saveGame = useCrazy8sStore(s => s.saveGame);
   const loadGame = useCrazy8sStore(s => s.loadGame);
   const hasSavedGame = useCrazy8sStore(s => s.hasSavedGame);
@@ -121,6 +123,20 @@ export default function Crazy8s() {
           <option value={BotDifficulty.EASY}>Easy</option>
           <option value={BotDifficulty.MEDIUM}>Medium</option>
           <option value={BotDifficulty.HARD}>Hard</option>
+        </select>
+      </div>
+
+      {/* Game Mode Selector */}
+      <div style={{ background: '#333', padding: 12, borderRadius: 8, marginBottom: 16 }}>
+        <strong>Game Mode:</strong>
+        <select 
+          value={gameMode} 
+          onChange={(e) => setGameMode(e.target.value as GameMode)}
+          style={{ marginLeft: 12, padding: '4px 8px', borderRadius: 4 }}
+          aria-label="Game Mode"
+        >
+          <option value={GameMode.HUMAN_VS_BOT}>Human vs Bot</option>
+          <option value={GameMode.HUMAN_VS_HUMAN}>Human vs Human</option>
         </select>
       </div>
 
@@ -209,6 +225,9 @@ export default function Crazy8s() {
             <strong>Turn:</strong> {turn === 'player' ? 'Your Turn' : 'Bot Turn'}
           </div>
           <div>
+            <strong>Game Mode:</strong> {gameMode === GameMode.HUMAN_VS_BOT ? 'Human vs Bot' : 'Human vs Human'}
+          </div>
+          <div>
             <strong>Stock Pile:</strong> {stockPile.length} cards
           </div>
           <div>
@@ -217,29 +236,59 @@ export default function Crazy8s() {
         </div>
       </div>
 
-      {/* Bot Hand (Face Down) */}
+      {/* Bot Hand */}
       <div style={{ background: '#333', padding: 16, borderRadius: 8, marginBottom: 16 }}>
-        <h3 style={{ margin: '0 0 12px 0' }}>Bot's Hand ({botHand.length} cards)</h3>
+        <h3 style={{ margin: '0 0 12px 0' }}>
+          {gameMode === GameMode.HUMAN_VS_BOT ? 'Bot' : 'Player 2'}'s Hand ({botHand.length} cards)
+        </h3>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {botHand.map((_, index) => (
-            <div
-              key={index}
-              style={{
-                width: 60,
-                height: 80,
-                background: '#444',
-                border: '2px solid #666',
-                borderRadius: 8,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 24,
-                color: '#666',
-              }}
-            >
-              🂠
-            </div>
-          ))}
+          {botHand.map((card, index) => {
+            if (gameMode === GameMode.HUMAN_VS_BOT) {
+              // Show face down cards in bot mode
+              return (
+                <div
+                  key={index}
+                  style={{
+                    width: 60,
+                    height: 80,
+                    background: '#444',
+                    border: '2px solid #666',
+                    borderRadius: 8,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 24,
+                    color: '#666',
+                  }}
+                >
+                  🂠
+                </div>
+              );
+            } else {
+              // Show actual cards in human vs human mode
+              const { symbol, color } = getCardDisplay(card);
+              return (
+                <div
+                  key={card.id}
+                  style={{
+                    width: 60,
+                    height: 80,
+                    background: 'white',
+                    border: '2px solid #333',
+                    borderRadius: 8,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 18,
+                    fontWeight: 'bold',
+                    color,
+                  }}
+                >
+                  {symbol}
+                </div>
+              );
+            }
+          })}
         </div>
       </div>
 

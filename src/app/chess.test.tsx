@@ -36,7 +36,18 @@ describe('Chess Component', () => {
       gameState: 'playing',
       history: [useChessStore.getState().board],
       historyIndex: 0,
-      stats: { wins: 0, losses: 0, totalGames: 0 },
+              stats: { 
+          wins: 0, 
+          losses: 0, 
+          totalGames: 0, 
+          currentWinStreak: 0,
+          bestWinStreak: 0,
+          averageMovesPerGame: 0,
+          totalMoves: 0,
+          fastestWin: 0,
+          longestGame: 0,
+          lastGameDate: null,
+        },
       botDifficulty: BotDifficulty.MEDIUM,
       lastMove: null,
       pendingPromotion: null,
@@ -118,7 +129,14 @@ describe('Chess Component', () => {
     expect(useChessStore.getState().stats).toEqual({
       wins: 0,
       losses: 0,
-      totalGames: 0
+      totalGames: 0,
+      currentWinStreak: 0,
+      bestWinStreak: 0,
+      averageMovesPerGame: 0,
+      totalMoves: 0,
+      fastestWin: 0,
+      longestGame: 0,
+      lastGameDate: null,
     });
   });
 
@@ -236,5 +254,25 @@ describe('Chess Component', () => {
     
     // Verify that the game mode selector shows the correct value
     expect(gameModeSelect).toHaveValue('human_vs_human');
+  });
+
+  test('enhanced statistics structure includes all required fields', () => {
+    const { getByText } = render(<Chess />);
+    
+    // Check that the enhanced stats structure is properly initialized
+    const stats = useChessStore.getState().stats;
+    expect(stats).toHaveProperty('currentWinStreak');
+    expect(stats).toHaveProperty('bestWinStreak');
+    expect(stats).toHaveProperty('averageMovesPerGame');
+    expect(stats).toHaveProperty('totalMoves');
+    expect(stats).toHaveProperty('fastestWin');
+    expect(stats).toHaveProperty('longestGame');
+    expect(stats).toHaveProperty('lastGameDate');
+    
+    // Check that the UI shows the enhanced stats structure
+    expect(getByText(/Win Rate:/)).toBeInTheDocument();
+    expect(getByText(/Current Streak:/)).toBeInTheDocument();
+    expect(getByText(/Best Streak:/)).toBeInTheDocument();
+    expect(getByText(/Avg Moves:/)).toBeInTheDocument();
   });
 }); 
