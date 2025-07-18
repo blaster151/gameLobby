@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { useCheckersStore, PlayerType, Board, Pos, BotDifficulty } from './checkersStore';
+import { useCheckersStore, PlayerType, Board, BotDifficulty, GameMode } from './checkersStore';
 import Tutorial from './components/Tutorial';
 import { checkersTutorial } from './data/tutorials';
 
@@ -34,6 +34,7 @@ export default function Checkers() {
   const gameState = useCheckersStore(s => s.gameState);
   const stats = useCheckersStore(s => s.stats);
   const botDifficulty = useCheckersStore(s => s.botDifficulty);
+  const gameMode = useCheckersStore(s => s.gameMode);
   const setBoard = useCheckersStore(s => s.setBoard);
   const setSelected = useCheckersStore(s => s.setSelected);
   const setTurn = useCheckersStore(s => s.setTurn);
@@ -47,6 +48,7 @@ export default function Checkers() {
   const updateStats = useCheckersStore(s => s.updateStats);
   const resetStats = useCheckersStore(s => s.resetStats);
   const setBotDifficulty = useCheckersStore(s => s.setBotDifficulty);
+  const setGameMode = useCheckersStore(s => s.setGameMode);
   const saveGame = useCheckersStore(s => s.saveGame);
   const loadGame = useCheckersStore(s => s.loadGame);
   const hasSavedGame = useCheckersStore(s => s.hasSavedGame);
@@ -65,10 +67,19 @@ export default function Checkers() {
   }
 
   function handleCellClick(y: number, x: number) {
-    if (turn !== PlayerType.PLAYER || gameState !== 'playing') return;
+    if (gameState !== 'playing') return;
+    
+    // In human vs human mode, allow both players to move their pieces
+    // In human vs bot mode, only allow player to move
+    const canMovePiece = gameMode === GameMode.HUMAN_VS_HUMAN ? 
+      (turn === PlayerType.PLAYER && board[y][x] === PlayerType.PLAYER) || 
+      (turn === PlayerType.BOT && board[y][x] === PlayerType.BOT) :
+      (turn === PlayerType.PLAYER && board[y][x] === PlayerType.PLAYER);
+    
     if (selected) {
       const [sy, sx] = selected;
-      if (isValidMove(board, sy, sx, y, x, PlayerType.PLAYER)) {
+      const currentPlayer = turn === PlayerType.PLAYER ? PlayerType.PLAYER : PlayerType.BOT;
+      if (isValidMove(board, sy, sx, y, x, currentPlayer)) {
         const newBoard = movePiece(board, sy, sx, y, x);
         setBoard(newBoard);
         setSelected(null);
@@ -77,8 +88,11 @@ export default function Checkers() {
         const newGameState = checkGameState(newBoard);
         setGameState(newGameState);
         if (newGameState === 'playing') {
-          setTurn(PlayerType.BOT);
-          setTimeout(() => botMove(newBoard), 500);
+          setTurn(turn === PlayerType.PLAYER ? PlayerType.BOT : PlayerType.PLAYER);
+          // Bot move after player move (only in HUMAN_VS_BOT mode)
+          if (gameMode === GameMode.HUMAN_VS_BOT && turn === PlayerType.PLAYER) {
+            setTimeout(() => botMove(newBoard), 500);
+          }
         } else {
           updateStats(newGameState === 'win' ? 'win' : 'loss');
           setMessage(newGameState === 'win' ? 'You win!' : 'You lose!');
@@ -86,7 +100,7 @@ export default function Checkers() {
       } else {
         setSelected(null);
       }
-    } else if (board[y][x] === PlayerType.PLAYER) {
+    } else if (canMovePiece) {
       setSelected([y, x]);
     }
   }
@@ -344,6 +358,20 @@ export default function Checkers() {
           <option value={BotDifficulty.EASY}>Easy</option>
           <option value={BotDifficulty.MEDIUM}>Medium</option>
           <option value={BotDifficulty.HARD}>Hard</option>
+        </select>
+      </div>
+
+      {/* Game Mode Selector */}
+      <div style={{ background: '#333', padding: 12, borderRadius: 8, marginBottom: 16 }}>
+        <strong>Game Mode:</strong>
+        <select 
+          value={gameMode} 
+          onChange={(e) => setGameMode(e.target.value as GameMode)}
+          style={{ marginLeft: 12, padding: '4px 8px', borderRadius: 4 }}
+          aria-label="Game Mode"
+        >
+          <option value={GameMode.HUMAN_VS_BOT}>Human vs Bot</option>
+          <option value={GameMode.HUMAN_VS_HUMAN}>Human vs Human</option>
         </select>
       </div>
 

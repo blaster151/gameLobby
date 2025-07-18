@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import Checkers from './checkers';
+import { useCheckersStore } from './checkersStore';
 
 // Mock Next.js Link component
 jest.mock('next/link', () => {
@@ -97,9 +98,9 @@ describe('Checkers', () => {
 
   it('displays bot difficulty selector', () => {
     render(<Checkers />);
-    const difficultySelector = screen.getByRole('combobox');
+    const difficultySelector = screen.getByDisplayValue('Medium');
     expect(difficultySelector).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Medium')).toBeInTheDocument();
+    expect(difficultySelector).toHaveValue('medium');
   });
 
   it('supports keyboard navigation with arrow keys', () => {
@@ -249,5 +250,16 @@ describe('Checkers', () => {
 
   it.skip('navigates through move history', () => {
     // This test requires complex store initialization that's difficult to mock
+  });
+
+  test('game mode selector changes game mode', () => {
+    render(<Checkers />);
+    
+    const gameModeSelect = screen.getByRole('combobox', { name: /game mode/i });
+    expect(gameModeSelect).toBeInTheDocument();
+    
+    fireEvent.change(gameModeSelect, { target: { value: 'human_vs_human' } });
+    
+    expect(useCheckersStore.getState().gameMode).toBe('human_vs_human');
   });
 }); 

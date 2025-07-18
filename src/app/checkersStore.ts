@@ -6,10 +6,20 @@ export enum PlayerType {
   BOT = 2,
 }
 
+export enum PlayerColor {
+  WHITE = 'white',
+  BLACK = 'black',
+}
+
 export enum BotDifficulty {
   EASY = 'easy',
   MEDIUM = 'medium',
   HARD = 'hard',
+}
+
+export enum GameMode {
+  HUMAN_VS_BOT = 'human_vs_bot',
+  HUMAN_VS_HUMAN = 'human_vs_human',
 }
 
 export type Cell = PlayerType;
@@ -45,6 +55,7 @@ interface CheckersState {
   historyIndex: number;
   stats: GameStats;
   botDifficulty: BotDifficulty;
+  gameMode: GameMode;
   setBoard: (b: Board) => void;
   setSelected: (p: Pos) => void;
   setTurn: (t: PlayerType) => void;
@@ -56,6 +67,7 @@ interface CheckersState {
   updateStats: (result: 'win' | 'loss') => void;
   resetStats: () => void;
   setBotDifficulty: (difficulty: BotDifficulty) => void;
+  setGameMode: (mode: GameMode) => void;
   saveGame: () => void;
   loadGame: () => void;
   hasSavedGame: () => boolean;
@@ -87,6 +99,7 @@ function saveGameState(state: any) {
       history: state.history,
       historyIndex: state.historyIndex,
       botDifficulty: state.botDifficulty,
+      gameMode: state.gameMode,
     }));
   }
 }
@@ -112,6 +125,7 @@ export const useCheckersStore = create<CheckersState>((set, get) => {
     history: [initialBoard()],
     historyIndex: 0,
     botDifficulty: BotDifficulty.MEDIUM,
+    gameMode: GameMode.HUMAN_VS_BOT,
   };
 
   return {
@@ -124,6 +138,7 @@ export const useCheckersStore = create<CheckersState>((set, get) => {
     historyIndex: initialState.historyIndex,
     stats: typeof window !== 'undefined' ? loadStats() : { wins: 0, losses: 0, totalGames: 0 },
     botDifficulty: initialState.botDifficulty,
+    gameMode: initialState.gameMode,
     setBoard: (b) => set({ board: b }),
     setSelected: (p) => set({ selected: p }),
     setTurn: (t) => set({ turn: t }),
@@ -140,6 +155,7 @@ export const useCheckersStore = create<CheckersState>((set, get) => {
         historyIndex: 0,
         stats: state.stats,
         botDifficulty: state.botDifficulty,
+        gameMode: state.gameMode,
       };
       saveStats(state.stats);
       return newState;
@@ -172,6 +188,7 @@ export const useCheckersStore = create<CheckersState>((set, get) => {
       saveStats(zeroStats);
     },
     setBotDifficulty: (difficulty) => set({ botDifficulty: difficulty }),
+    setGameMode: (mode) => set({ gameMode: mode }),
     saveGame: () => {
       const state = get();
       saveGameState(state);
@@ -186,6 +203,7 @@ export const useCheckersStore = create<CheckersState>((set, get) => {
           history: savedState.history,
           historyIndex: savedState.historyIndex,
           botDifficulty: savedState.botDifficulty,
+          gameMode: savedState.gameMode || GameMode.HUMAN_VS_BOT,
           message: savedState.gameState === 'playing' ? 'Your move!' : 'Game Over',
         });
       }
