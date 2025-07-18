@@ -73,6 +73,7 @@ interface GameStats {
   fastestWin: number; // in moves
   longestGame: number; // in moves
   lastGameDate: string | null;
+  achievements: string[]; // List of unlocked achievement IDs
 }
 
 function loadStats(): GameStats {
@@ -92,6 +93,7 @@ function loadStats(): GameStats {
             fastestWin: 0,
             longestGame: 0,
             lastGameDate: null,
+            achievements: [], // Ensure achievements is an array
           };
         }
         return parsed;
@@ -109,6 +111,7 @@ function loadStats(): GameStats {
     fastestWin: 0,
     longestGame: 0,
     lastGameDate: null,
+    achievements: [], // Ensure achievements is an array
   };
 }
 
@@ -207,6 +210,7 @@ export const useChessStore = create<ChessState>((set, get) => {
       fastestWin: 0,
       longestGame: 0,
       lastGameDate: null,
+      achievements: [], // Ensure achievements is an array
     },
     botDifficulty: initialState.botDifficulty,
     gameMode: initialState.gameMode,
@@ -253,11 +257,52 @@ export const useChessStore = create<ChessState>((set, get) => {
       const newBestStreak = Math.max(stats.bestWinStreak, newWinStreak);
       const newTotalMoves = stats.totalMoves + moveCount;
       const newTotalGames = stats.totalGames + 1;
+      const newWins = isWin ? stats.wins + 1 : stats.wins;
+      
+      // Check for achievements
+      const newAchievements = [...stats.achievements];
+      
+      // First Win achievement
+      if (newWins === 1 && !newAchievements.includes('first_win')) {
+        newAchievements.push('first_win');
+      }
+      
+      // Win Streak achievements
+      if (newWinStreak === 3 && !newAchievements.includes('win_streak_3')) {
+        newAchievements.push('win_streak_3');
+      }
+      if (newWinStreak === 5 && !newAchievements.includes('win_streak_5')) {
+        newAchievements.push('win_streak_5');
+      }
+      if (newWinStreak === 10 && !newAchievements.includes('win_streak_10')) {
+        newAchievements.push('win_streak_10');
+      }
+      
+      // Total Games achievements
+      if (newTotalGames === 10 && !newAchievements.includes('games_10')) {
+        newAchievements.push('games_10');
+      }
+      if (newTotalGames === 50 && !newAchievements.includes('games_50')) {
+        newAchievements.push('games_50');
+      }
+      if (newTotalGames === 100 && !newAchievements.includes('games_100')) {
+        newAchievements.push('games_100');
+      }
+      
+      // Fast Win achievement
+      if (isWin && moveCount <= 10 && !newAchievements.includes('fast_win')) {
+        newAchievements.push('fast_win');
+      }
+      
+      // Marathon achievement
+      if (moveCount >= 50 && !newAchievements.includes('marathon')) {
+        newAchievements.push('marathon');
+      }
       
       const newStats = {
         ...stats,
         totalGames: newTotalGames,
-        wins: isWin ? stats.wins + 1 : stats.wins,
+        wins: newWins,
         losses: result === 'loss' ? stats.losses + 1 : stats.losses,
         currentWinStreak: newWinStreak,
         bestWinStreak: newBestStreak,
@@ -266,6 +311,7 @@ export const useChessStore = create<ChessState>((set, get) => {
         fastestWin: isWin && (stats.fastestWin === 0 || moveCount < stats.fastestWin) ? moveCount : stats.fastestWin,
         longestGame: moveCount > stats.longestGame ? moveCount : stats.longestGame,
         lastGameDate: new Date().toISOString(),
+        achievements: newAchievements,
       };
       set({ stats: newStats });
       saveStats(newStats);
@@ -282,6 +328,7 @@ export const useChessStore = create<ChessState>((set, get) => {
         fastestWin: 0,
         longestGame: 0,
         lastGameDate: null,
+        achievements: [], // Ensure achievements is an array
       };
       set({ stats: zeroStats });
       saveStats(zeroStats);

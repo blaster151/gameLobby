@@ -743,6 +743,48 @@ export default function Chess() {
         </button>
       </div>
       
+      {/* Achievements */}
+      {stats.achievements.length > 0 && (
+        <div style={{ background: '#333', padding: 12, borderRadius: 8, marginBottom: 16 }}>
+          <strong>Achievements ({stats.achievements.length}):</strong>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+            {stats.achievements.map(achievement => {
+              const achievementInfo = {
+                first_win: { name: 'First Victory', icon: '🏆', color: '#fbbf24' },
+                win_streak_3: { name: 'Hot Streak', icon: '🔥', color: '#ef4444' },
+                win_streak_5: { name: 'Unstoppable', icon: '⚡', color: '#8b5cf6' },
+                win_streak_10: { name: 'Legendary', icon: '👑', color: '#f59e0b' },
+                games_10: { name: 'Dedicated Player', icon: '🎯', color: '#10b981' },
+                games_50: { name: 'Veteran', icon: '🎖️', color: '#6366f1' },
+                games_100: { name: 'Master', icon: '🏅', color: '#ec4899' },
+                fast_win: { name: 'Quick Victory', icon: '⚡', color: '#fbbf24' },
+                marathon: { name: 'Marathon', icon: '🏃', color: '#059669' },
+              }[achievement] || { name: achievement, icon: '🏆', color: '#6366f1' };
+              
+              return (
+                <div
+                  key={achievement}
+                  style={{
+                    background: achievementInfo.color,
+                    color: 'white',
+                    padding: '4px 8px',
+                    borderRadius: 4,
+                    fontSize: '0.8em',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                  title={achievementInfo.name}
+                >
+                  <span>{achievementInfo.icon}</span>
+                  <span>{achievementInfo.name}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      
       {/* Tutorial Section */}
       <div style={{ background: '#333', padding: 12, borderRadius: 8, marginBottom: 16 }}>
         <strong>How to Play:</strong> Chess is a strategic board game. White moves first. Each piece moves in specific ways. The goal is to checkmate the opponent's king.

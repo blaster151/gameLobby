@@ -47,6 +47,7 @@ describe('Chess Component', () => {
           fastestWin: 0,
           longestGame: 0,
           lastGameDate: null,
+          achievements: [],
         },
       botDifficulty: BotDifficulty.MEDIUM,
       lastMove: null,
@@ -137,6 +138,7 @@ describe('Chess Component', () => {
       fastestWin: 0,
       longestGame: 0,
       lastGameDate: null,
+      achievements: [],
     });
   });
 
@@ -257,6 +259,23 @@ describe('Chess Component', () => {
   });
 
   test('enhanced statistics structure includes all required fields', () => {
+    // Set up some stats first so the enhanced stats section is rendered
+    useChessStore.setState({
+      stats: {
+        wins: 5,
+        losses: 3,
+        totalGames: 8,
+        currentWinStreak: 2,
+        bestWinStreak: 4,
+        averageMovesPerGame: 25,
+        totalMoves: 200,
+        fastestWin: 15,
+        longestGame: 45,
+        lastGameDate: '2023-01-01T00:00:00.000Z',
+        achievements: [],
+      }
+    });
+    
     const { getByText } = render(<Chess />);
     
     // Check that the enhanced stats structure is properly initialized
@@ -274,5 +293,21 @@ describe('Chess Component', () => {
     expect(getByText(/Current Streak:/)).toBeInTheDocument();
     expect(getByText(/Best Streak:/)).toBeInTheDocument();
     expect(getByText(/Avg Moves:/)).toBeInTheDocument();
+  });
+
+  test('achievement system tracks unlocked achievements', () => {
+    const { getByText } = render(<Chess />);
+    
+    // Check that achievements array exists in stats
+    const stats = useChessStore.getState().stats;
+    expect(stats).toHaveProperty('achievements');
+    expect(Array.isArray(stats.achievements)).toBe(true);
+    
+    // Simulate unlocking an achievement
+    const updateStats = useChessStore.getState().updateStats;
+    updateStats('win', 5); // This should trigger first_win achievement
+    
+    const updatedStats = useChessStore.getState().stats;
+    expect(updatedStats.achievements).toContain('first_win');
   });
 }); 
