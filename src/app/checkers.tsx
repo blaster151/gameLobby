@@ -59,11 +59,59 @@ export default function Checkers() {
   const [showTutorial, setShowTutorial] = React.useState(false);
 
   function checkGameState(board: Board): string {
-    const playerPieces = board.flat().filter(cell => cell === PieceType.PLAYER).length;
-    const botPieces = board.flat().filter(cell => cell === PieceType.BOT).length;
+    const playerPieces = board.flat().filter(cell => cell === PieceType.PLAYER || cell === PieceType.PLAYER_KING).length;
+    const botPieces = board.flat().filter(cell => cell === PieceType.BOT || cell === PieceType.BOT_KING).length;
+    
+    // Check for piece elimination
     if (playerPieces === 0) return 'lose';
     if (botPieces === 0) return 'win';
+    
+    // Check for stalemate
+    const playerMoves = getValidMoves(board, PieceType.PLAYER);
+    const botMoves = getValidMoves(board, PieceType.BOT);
+    
+    if (playerMoves.length === 0 && botMoves.length === 0) {
+      return 'stalemate';
+    }
+    
+    if (playerMoves.length === 0) {
+      return 'lose'; // Player has no moves but bot does
+    }
+    
+    if (botMoves.length === 0) {
+      return 'win'; // Bot has no moves but player does
+    }
+    
     return 'playing';
+  }
+
+  function isStalemate(board: Board): boolean {
+    const playerMoves = getValidMoves(board, PieceType.PLAYER);
+    const botMoves = getValidMoves(board, PieceType.BOT);
+    return playerMoves.length === 0 && botMoves.length === 0;
+  }
+
+  function hasNoMoves(board: Board, player: PieceType): boolean {
+    return getValidMoves(board, player).length === 0;
+  }
+
+  function getStalemateReason(board: Board): string {
+    const playerMoves = getValidMoves(board, PieceType.PLAYER);
+    const botMoves = getValidMoves(board, PieceType.BOT);
+    
+    if (playerMoves.length === 0 && botMoves.length === 0) {
+      return 'Both players have no valid moves';
+    }
+    
+    if (playerMoves.length === 0) {
+      return 'Player has no valid moves';
+    }
+    
+    if (botMoves.length === 0) {
+      return 'Bot has no valid moves';
+    }
+    
+    return 'Game is still playable';
   }
 
   function handleCellClick(y: number, x: number) {
@@ -94,8 +142,15 @@ export default function Checkers() {
             setTimeout(() => botMove(newBoard), 500);
           }
         } else {
-          updateStats(newGameState === 'win' ? 'win' : 'loss');
-          setMessage(newGameState === 'win' ? 'You win!' : 'You lose!');
+          if (newGameState === 'win') {
+            updateStats('win');
+            setMessage('You win!');
+          } else if (newGameState === 'lose') {
+            updateStats('loss');
+            setMessage('You lose!');
+          } else if (newGameState === 'stalemate') {
+            setMessage('Stalemate! No valid moves for either player.');
+          }
         }
       } else {
         setSelected(null);
@@ -229,8 +284,15 @@ export default function Checkers() {
       setTurn(PieceType.PLAYER);
       setMessage('Your move!');
     } else {
-      updateStats(newGameState === 'win' ? 'win' : 'loss');
-      setMessage(newGameState === 'lose' ? 'You lose!' : 'You win!');
+      if (newGameState === 'win') {
+        updateStats('win');
+        setMessage('You win!');
+      } else if (newGameState === 'lose') {
+        updateStats('loss');
+        setMessage('You lose!');
+      } else if (newGameState === 'stalemate') {
+        setMessage('Stalemate! No valid moves for either player.');
+      }
     }
   }
 
@@ -270,8 +332,15 @@ export default function Checkers() {
       setTurn(PieceType.PLAYER);
       setMessage('Your move!');
     } else {
-      updateStats(newGameState === 'win' ? 'win' : 'loss');
-      setMessage(newGameState === 'lose' ? 'You lose!' : 'You win!');
+      if (newGameState === 'win') {
+        updateStats('win');
+        setMessage('You win!');
+      } else if (newGameState === 'lose') {
+        updateStats('loss');
+        setMessage('You lose!');
+      } else if (newGameState === 'stalemate') {
+        setMessage('Stalemate! No valid moves for either player.');
+      }
     }
   }
 
@@ -320,8 +389,15 @@ export default function Checkers() {
       setTurn(PieceType.PLAYER);
       setMessage('Your move!');
     } else {
-      updateStats(newGameState === 'win' ? 'win' : 'loss');
-      setMessage(newGameState === 'lose' ? 'You lose!' : 'You win!');
+      if (newGameState === 'win') {
+        updateStats('win');
+        setMessage('You win!');
+      } else if (newGameState === 'lose') {
+        updateStats('loss');
+        setMessage('You lose!');
+      } else if (newGameState === 'stalemate') {
+        setMessage('Stalemate! No valid moves for either player.');
+      }
     }
   }
 
@@ -340,7 +416,20 @@ export default function Checkers() {
   }
 
   function isValidMove(board: Board, sy: number, sx: number, dy: number, dx: number, player: PieceType): boolean {
-    if (board[dy][dx] !== PieceType.EMPTY) return false;
+    // Validate board boundaries for source and destination
+    if (!isValidPosition(sy, sx) || !isValidPosition(dy, dx)) {
+      return false;
+    }
+    
+    // Validate that source position contains a piece
+    if (board[sy][sx] === PieceType.EMPTY) {
+      return false;
+    }
+    
+    // Validate that destination is empty
+    if (board[dy][dx] !== PieceType.EMPTY) {
+      return false;
+    }
     
     const piece = board[sy][sx];
     const isKingPiece = isKing(piece);
@@ -366,10 +455,16 @@ export default function Checkers() {
       if (yDiff !== dir) return false;
     }
     
-    // For capture moves, validate the captured piece
+    // For capture moves, validate the captured piece and its position
     if (isCapture) {
       const captureY = sy + (yDiff / 2);
       const captureX = sx + ((dx - sx) / 2);
+      
+      // Validate capture position is within bounds
+      if (!isValidPosition(captureY, captureX)) {
+        return false;
+      }
+      
       const capturedPiece = board[captureY][captureX];
       const opponent = player === PieceType.PLAYER ? PieceType.BOT : PieceType.PLAYER;
       const opponentKing = player === PieceType.PLAYER ? PieceType.BOT_KING : PieceType.PLAYER_KING;
@@ -383,9 +478,31 @@ export default function Checkers() {
     return true;
   }
 
+  function isValidPosition(y: number, x: number): boolean {
+    return y >= 0 && y < BOARD_SIZE && x >= 0 && x < BOARD_SIZE;
+  }
+
+  function isOnBoard(y: number, x: number): boolean {
+    return isValidPosition(y, x);
+  }
+
+  function validateMoveCoordinates(sy: number, sx: number, dy: number, dx: number): boolean {
+    return isValidPosition(sy, sx) && isValidPosition(dy, dx);
+  }
+
   function movePiece(board: Board, sy: number, sx: number, dy: number, dx: number): Board {
+    // Validate coordinates before proceeding
+    if (!validateMoveCoordinates(sy, sx, dy, dx)) {
+      throw new Error('Invalid move coordinates: out of bounds');
+    }
+    
     const newBoard = clone(board);
     const piece = newBoard[sy][sx];
+    
+    // Validate that source contains a piece
+    if (piece === PieceType.EMPTY) {
+      throw new Error('Invalid move: source position is empty');
+    }
     
     // Check if this is a capture move
     const yDiff = dy - sy;
@@ -396,10 +513,16 @@ export default function Checkers() {
     newBoard[dy][dx] = piece;
     newBoard[sy][sx] = PieceType.EMPTY;
     
-    // Handle capture
+    // Handle capture with boundary validation
     if (isCapture) {
       const captureY = sy + (yDiff / 2);
       const captureX = sx + (xDiff / 2);
+      
+      // Validate capture position is within bounds
+      if (!isValidPosition(captureY, captureX)) {
+        throw new Error('Invalid capture: capture position out of bounds');
+      }
+      
       newBoard[captureY][captureX] = PieceType.EMPTY;
     }
     

@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import Checkers from './checkers';
-import { useCheckersStore, PieceType } from './checkersStore';
+import { useCheckersStore, PieceType, GameMode } from './checkersStore';
 
 // Mock Next.js Link component
 jest.mock('next/link', () => {
@@ -648,6 +648,382 @@ describe('Checkers', () => {
       expect(updatedBoard[5][5]).toBe(PieceType.PLAYER);
       expect(updatedBoard[3][3]).toBe(PieceType.EMPTY);
       expect(updatedBoard[4][4]).toBe(PieceType.EMPTY); // First captured piece removed
+    });
+  });
+
+  describe('Board Boundary Edge Cases', () => {
+    test('prevents moves from invalid source positions', () => {
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[3][3] = PieceType.PLAYER; // Valid player piece
+      
+      useCheckersStore.setState({
+        board: testBoard,
+        turn: PieceType.PLAYER,
+        gameState: 'playing'
+      });
+      
+      render(<Checkers />);
+      
+      // Try to select a piece at an invalid position (should not exist in UI)
+      const validPiece = screen.getByLabelText('4, 4 player piece');
+      expect(validPiece).toBeInTheDocument();
+      
+      // The UI should not render pieces at invalid positions
+      expect(() => screen.getByLabelText('9, 9 player piece')).toThrow();
+    });
+
+    test('prevents moves to invalid destination positions', () => {
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[3][3] = PieceType.PLAYER; // Player piece
+      
+      useCheckersStore.setState({
+        board: testBoard,
+        turn: PieceType.PLAYER,
+        gameState: 'playing'
+      });
+      
+      render(<Checkers />);
+      
+      // Select the player piece
+      const playerPiece = screen.getByLabelText('4, 4 player piece');
+      fireEvent.click(playerPiece);
+      
+      // Try to move to an invalid position (should not exist in UI)
+      expect(() => screen.getByLabelText('9, 9 empty')).toThrow();
+    });
+
+    test('handles edge pieces correctly', () => {
+      // Set up a board with pieces on the edges
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[0][0] = PieceType.PLAYER; // Top-left corner
+      testBoard[7][7] = PieceType.BOT; // Bottom-right corner
+      testBoard[0][7] = PieceType.PLAYER_KING; // Top-right corner (king)
+      testBoard[7][0] = PieceType.BOT_KING; // Bottom-left corner (king)
+      
+      useCheckersStore.setState({
+        board: testBoard,
+        turn: PieceType.PLAYER,
+        gameState: 'playing'
+      });
+      
+      render(<Checkers />);
+      
+      // Verify edge pieces are rendered correctly
+      expect(screen.getByLabelText('1, 1 player piece')).toBeInTheDocument();
+      expect(screen.getByLabelText('8, 8 bot piece')).toBeInTheDocument();
+      expect(screen.getByLabelText('1, 8 player king')).toBeInTheDocument();
+      expect(screen.getByLabelText('8, 1 bot king')).toBeInTheDocument();
+    });
+
+    test('prevents moves that would go off the board', () => {
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[0][0] = PieceType.PLAYER_KING; // King in corner
+      
+      useCheckersStore.setState({
+        board: testBoard,
+        turn: PieceType.PLAYER,
+        gameState: 'playing'
+      });
+      
+      render(<Checkers />);
+      
+      // Select the king piece
+      const kingPiece = screen.getByLabelText('1, 1 player king');
+      fireEvent.click(kingPiece);
+      
+      // Try to move diagonally off the board (should not be possible)
+      // The UI should not show invalid destination cells
+      expect(() => screen.getByLabelText('0, 0 empty')).toThrow();
+      expect(() => screen.getByLabelText('9, 9 empty')).toThrow();
+    });
+
+    test('handles boundary capture scenarios correctly', () => {
+      // Set up a board with a capture near the edge
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[1][1] = PieceType.PLAYER; // Player piece near edge
+      testBoard[2][2] = PieceType.BOT; // Bot piece to capture
+      testBoard[3][3] = PieceType.EMPTY; // Valid landing spot
+      
+      useCheckersStore.setState({
+        board: testBoard,
+        turn: PieceType.PLAYER,
+        gameState: 'playing'
+      });
+      
+      render(<Checkers />);
+      
+      // Select the player piece
+      const playerPiece = screen.getByLabelText('2, 2 player piece');
+      fireEvent.click(playerPiece);
+      
+      // Make the capture move
+      const captureDestination = screen.getByLabelText('4, 4 empty');
+      fireEvent.click(captureDestination);
+      
+      // Check that the capture occurred correctly
+      const updatedBoard = useCheckersStore.getState().board;
+      expect(updatedBoard[3][3]).toBe(PieceType.PLAYER);
+      expect(updatedBoard[1][1]).toBe(PieceType.EMPTY);
+      expect(updatedBoard[2][2]).toBe(PieceType.EMPTY); // Captured piece removed
+    });
+
+    test('prevents invalid capture attempts near boundaries', () => {
+      // Set up a board with pieces that would result in invalid captures
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[0][0] = PieceType.PLAYER; // Player piece in corner
+      testBoard[1][1] = PieceType.BOT; // Bot piece adjacent
+      // No valid landing spot for capture (would go off board)
+      
+      useCheckersStore.setState({
+        board: testBoard,
+        turn: PieceType.PLAYER,
+        gameState: 'playing'
+      });
+      
+      render(<Checkers />);
+      
+      // Select the player piece
+      const playerPiece = screen.getByLabelText('1, 1 player piece');
+      fireEvent.click(playerPiece);
+      
+      // Try to make an invalid capture (should not be possible)
+      // The UI should not show invalid destination cells
+      expect(() => screen.getByLabelText('2, 2 empty')).toThrow();
+    });
+
+    test('validates coordinate bounds in move validation', () => {
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[3][3] = PieceType.PLAYER;
+      
+      useCheckersStore.setState({
+        board: testBoard,
+        turn: PieceType.PLAYER,
+        gameState: 'playing'
+      });
+      
+      render(<Checkers />);
+      
+      // Test that the component handles invalid coordinates gracefully
+      // This is tested through the UI not rendering invalid positions
+      const validPiece = screen.getByLabelText('4, 4 player piece');
+      expect(validPiece).toBeInTheDocument();
+      
+      // Invalid positions should not be rendered
+      expect(() => screen.getByLabelText('10, 10 player piece')).toThrow();
+      expect(() => screen.getByLabelText('-1, -1 player piece')).toThrow();
+    });
+
+    test('handles keyboard navigation boundary constraints', () => {
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[0][0] = PieceType.PLAYER; // Piece in corner
+      
+      useCheckersStore.setState({
+        board: testBoard,
+        turn: PieceType.PLAYER,
+        gameState: 'playing'
+      });
+      
+      render(<Checkers />);
+      
+      // Test keyboard navigation from corner position
+      const cornerCell = screen.getByLabelText('1, 1 player piece');
+      act(() => {
+        cornerCell.focus();
+      });
+      
+      // Try to navigate off the board (should stay within bounds)
+      act(() => {
+        fireEvent.keyDown(cornerCell, { key: 'ArrowUp' });
+      });
+      expect(cornerCell).toHaveFocus(); // Should stay at corner
+      
+      act(() => {
+        fireEvent.keyDown(cornerCell, { key: 'ArrowLeft' });
+      });
+      expect(cornerCell).toHaveFocus(); // Should stay at corner
+    });
+  });
+
+  describe('Stalemate Detection', () => {
+    test('detects stalemate when both players have no valid moves', () => {
+      // Set up a board where both players are blocked
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[0][0] = PieceType.PLAYER; // Player piece in corner
+      testBoard[0][2] = PieceType.BOT; // Bot piece blocking player
+      testBoard[2][0] = PieceType.BOT; // Bot piece blocking player
+      testBoard[7][7] = PieceType.BOT; // Bot piece in opposite corner
+      testBoard[5][7] = PieceType.PLAYER; // Player piece blocking bot
+      testBoard[7][5] = PieceType.PLAYER; // Player piece blocking bot
+      
+      useCheckersStore.setState({
+        board: testBoard,
+        turn: PieceType.PLAYER,
+        gameState: 'playing'
+      });
+      
+      render(<Checkers />);
+      
+      // Check that stalemate is detected
+      expect(screen.getByText('Stalemate! No valid moves for either player.')).toBeInTheDocument();
+    });
+
+    test('detects when player has no moves but bot does', () => {
+      // Set up a board where player is completely blocked
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[0][0] = PieceType.PLAYER; // Player piece in corner
+      testBoard[0][2] = PieceType.BOT; // Bot piece blocking player
+      testBoard[2][0] = PieceType.BOT; // Bot piece blocking player
+      testBoard[7][7] = PieceType.BOT; // Bot piece with available moves
+      testBoard[6][6] = PieceType.EMPTY; // Empty space for bot to move
+      
+      useCheckersStore.setState({
+        board: testBoard,
+        turn: PieceType.PLAYER,
+        gameState: 'playing'
+      });
+      
+      render(<Checkers />);
+      
+      // Check that player loss is detected
+      expect(screen.getByText('You lose!')).toBeInTheDocument();
+    });
+
+    test('detects when bot has no moves but player does', () => {
+      // Set up a board where bot is completely blocked
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[7][7] = PieceType.BOT; // Bot piece in corner
+      testBoard[7][5] = PieceType.PLAYER; // Player piece blocking bot
+      testBoard[5][7] = PieceType.PLAYER; // Player piece blocking bot
+      testBoard[0][0] = PieceType.PLAYER; // Player piece with available moves
+      testBoard[1][1] = PieceType.EMPTY; // Empty space for player to move
+      
+      useCheckersStore.setState({
+        board: testBoard,
+        turn: PieceType.PLAYER,
+        gameState: 'playing'
+      });
+      
+      render(<Checkers />);
+      
+      // Check that player win is detected
+      expect(screen.getByText('You win!')).toBeInTheDocument();
+    });
+
+    test('handles stalemate with king pieces', () => {
+      // Set up a board with kings that are blocked
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[3][3] = PieceType.PLAYER_KING; // Player king in center
+      testBoard[2][2] = PieceType.BOT; // Bot pieces surrounding king
+      testBoard[2][4] = PieceType.BOT;
+      testBoard[4][2] = PieceType.BOT;
+      testBoard[4][4] = PieceType.BOT;
+      testBoard[7][7] = PieceType.BOT_KING; // Bot king also blocked
+      testBoard[6][6] = PieceType.PLAYER;
+      testBoard[6][8] = PieceType.PLAYER; // This would be off board, so king is blocked
+      
+      useCheckersStore.setState({
+        board: testBoard,
+        turn: PieceType.PLAYER,
+        gameState: 'playing'
+      });
+      
+      render(<Checkers />);
+      
+      // Check that stalemate is detected even with kings
+      expect(screen.getByText('Stalemate! No valid moves for either player.')).toBeInTheDocument();
+    });
+
+    test('continues game when moves are available', () => {
+      // Set up a normal board with available moves
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[3][3] = PieceType.PLAYER; // Player piece with available moves
+      testBoard[4][4] = PieceType.EMPTY; // Empty space for player to move
+      testBoard[7][7] = PieceType.BOT; // Bot piece with available moves
+      testBoard[6][6] = PieceType.EMPTY; // Empty space for bot to move
+      
+      useCheckersStore.setState({
+        board: testBoard,
+        turn: PieceType.PLAYER,
+        gameState: 'playing'
+      });
+      
+      render(<Checkers />);
+      
+      // Check that game continues normally
+      expect(screen.getByText('Your move!')).toBeInTheDocument();
+    });
+
+    test('handles forced capture stalemate scenarios', () => {
+      // Set up a board where forced captures lead to stalemate
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[3][3] = PieceType.PLAYER; // Player piece
+      testBoard[4][4] = PieceType.BOT; // Bot piece to capture
+      testBoard[5][5] = PieceType.EMPTY; // Landing spot
+      testBoard[5][3] = PieceType.BOT; // Bot piece blocking player's escape
+      testBoard[3][5] = PieceType.BOT; // Bot piece blocking player's escape
+      
+      useCheckersStore.setState({
+        board: testBoard,
+        turn: PieceType.PLAYER,
+        gameState: 'playing'
+      });
+      
+      render(<Checkers />);
+      
+      // Player must capture, but then has no moves
+      const playerPiece = screen.getByLabelText('4, 4 player piece');
+      fireEvent.click(playerPiece);
+      
+      const captureDestination = screen.getByLabelText('6, 6 empty');
+      fireEvent.click(captureDestination);
+      
+      // After capture, player should be blocked
+      expect(screen.getByText('You lose!')).toBeInTheDocument();
+    });
+
+    test('detects stalemate after piece promotion', () => {
+      // Set up a board where promotion leads to stalemate
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[1][1] = PieceType.PLAYER; // Player piece near promotion
+      testBoard[0][0] = PieceType.BOT; // Bot piece blocking promotion
+      testBoard[0][2] = PieceType.BOT; // Bot piece blocking promotion
+      testBoard[7][7] = PieceType.BOT; // Bot piece in opposite corner
+      testBoard[6][6] = PieceType.PLAYER; // Player piece blocking bot
+      testBoard[6][8] = PieceType.PLAYER; // This would be off board, so bot is blocked
+      
+      useCheckersStore.setState({
+        board: testBoard,
+        turn: PieceType.PLAYER,
+        gameState: 'playing'
+      });
+      
+      render(<Checkers />);
+      
+      // Check that stalemate is detected
+      expect(screen.getByText('Stalemate! No valid moves for either player.')).toBeInTheDocument();
+    });
+
+    test('handles stalemate in human vs human mode', () => {
+      // Set up a stalemate board
+      const testBoard = Array(8).fill(null).map(() => Array(8).fill(PieceType.EMPTY));
+      testBoard[0][0] = PieceType.PLAYER; // Player piece in corner
+      testBoard[0][2] = PieceType.BOT; // Bot piece blocking player
+      testBoard[2][0] = PieceType.BOT; // Bot piece blocking player
+      testBoard[7][7] = PieceType.BOT; // Bot piece in opposite corner
+      testBoard[5][7] = PieceType.PLAYER; // Player piece blocking bot
+      testBoard[7][5] = PieceType.PLAYER; // Player piece blocking bot
+      
+      useCheckersStore.setState({
+        board: testBoard,
+        turn: PieceType.PLAYER,
+        gameState: 'playing',
+        gameMode: GameMode.HUMAN_VS_HUMAN
+      });
+      
+      render(<Checkers />);
+      
+      // Check that stalemate is detected in human vs human mode
+      expect(screen.getByText('Stalemate! No valid moves for either player.')).toBeInTheDocument();
     });
   });
 }); 

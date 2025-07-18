@@ -29,8 +29,8 @@ Checkers:
         No chain capture detection
     Basic move validation
         No validation that captures are mandatory when available
-        Missing edge case handling for board boundaries
-        No stalemate detection
+        âœ… Missing edge case handling for board boundaries
+        âœ… No stalemate detection
         Simplified diagonal movement validation
     Simplified bot AI
         No look-ahead for capture sequences
