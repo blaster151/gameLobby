@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { useBackgammonStore, PlayerColor, BotDifficulty } from './backgammonStore';
+import { useBackgammonStore, PlayerColor, BotDifficulty, GameMode } from './backgammonStore';
 import Tutorial from './components/Tutorial';
 import { backgammonTutorial } from './data/tutorials';
 
@@ -36,6 +36,7 @@ export default function Backgammon() {
   const gameState = useBackgammonStore(s => s.gameState);
   const stats = useBackgammonStore(s => s.stats);
   const botDifficulty = useBackgammonStore(s => s.botDifficulty);
+  const gameMode = useBackgammonStore(s => s.gameMode);
   const dice = useBackgammonStore(s => s.dice);
   const usedDice = useBackgammonStore(s => s.usedDice);
   const history = useBackgammonStore(s => s.history);
@@ -52,6 +53,7 @@ export default function Backgammon() {
   const updateStats = useBackgammonStore(s => s.updateStats);
   const resetStats = useBackgammonStore(s => s.resetStats);
   const setBotDifficulty = useBackgammonStore(s => s.setBotDifficulty);
+  const setGameMode = useBackgammonStore(s => s.setGameMode);
   const saveGame = useBackgammonStore(s => s.saveGame);
   const loadGame = useBackgammonStore(s => s.loadGame);
   const hasSavedGame = useBackgammonStore(s => s.hasSavedGame);
@@ -61,26 +63,39 @@ export default function Backgammon() {
   const [showTutorial, setShowTutorial] = React.useState(false);
 
   function handlePointClick(pointIndex: number) {
-    if (gameState !== 'playing' || turn !== PlayerColor.WHITE) return;
+    if (gameState !== 'playing') return;
+    
+    // In human vs human mode, allow both players to move their pieces
+    // In human vs bot mode, only allow white (human) to move
+    const canMovePiece = gameMode === GameMode.HUMAN_VS_HUMAN ? 
+      (turn === PlayerColor.WHITE && board[pointIndex][0] > 0) || 
+      (turn === PlayerColor.BLACK && board[pointIndex][1] > 0) :
+      (turn === PlayerColor.WHITE && board[pointIndex][0] > 0);
     
     if (selectedPoint === null) {
       // Select point if it has player pieces
-      if (board[pointIndex][0] > 0) {
+      if (canMovePiece) {
         setSelectedPoint(pointIndex);
       }
     } else {
       // Try to move piece
       const availableDice = dice.filter(d => !usedDice.includes(d));
-      const validMoves = availableDice.map(die => selectedPoint + die).filter(to => to < BOARD_SIZE);
+      const currentPlayerIndex = turn === PlayerColor.WHITE ? 0 : 1;
+      const opponentIndex = turn === PlayerColor.WHITE ? 1 : 0;
+      
+      // Calculate valid moves based on current player
+      const validMoves = turn === PlayerColor.WHITE ? 
+        availableDice.map(die => selectedPoint + die).filter(to => to < BOARD_SIZE) :
+        availableDice.map(die => selectedPoint - die).filter(to => to >= 0);
       
       if (validMoves.includes(pointIndex)) {
         const newBoard = clone(board);
-        newBoard[selectedPoint][0]--;
-        newBoard[pointIndex][0]++;
+        newBoard[selectedPoint][currentPlayerIndex]--;
+        newBoard[pointIndex][currentPlayerIndex]++;
         
         // Handle capture
-        if (newBoard[pointIndex][1] === 1) {
-          newBoard[pointIndex][1] = 0;
+        if (newBoard[pointIndex][opponentIndex] === 1) {
+          newBoard[pointIndex][opponentIndex] = 0;
           // Add to bar (simplified)
         }
         
@@ -89,13 +104,15 @@ export default function Backgammon() {
         setSelectedPoint(null);
         
         // Mark die as used
-        const usedDie = pointIndex - selectedPoint;
+        const usedDie = turn === PlayerColor.WHITE ? 
+          pointIndex - selectedPoint : 
+          selectedPoint - pointIndex;
         setUsedDice([...usedDice, usedDie]);
         
         // Check if all dice used
         if (usedDice.length + 1 >= dice.length) {
-          setTurn(PlayerColor.BLACK);
-          setMessage('Black to roll');
+          setTurn(turn === PlayerColor.WHITE ? PlayerColor.BLACK : PlayerColor.WHITE);
+          setMessage(turn === PlayerColor.WHITE ? 'Black to roll' : 'White to roll');
           setDice([]);
           setUsedDice([]);
         }
@@ -135,6 +152,20 @@ export default function Backgammon() {
           <option value={BotDifficulty.EASY}>Easy</option>
           <option value={BotDifficulty.MEDIUM}>Medium</option>
           <option value={BotDifficulty.HARD}>Hard</option>
+        </select>
+      </div>
+
+      {/* Game Mode Selector */}
+      <div style={{ background: '#333', padding: 12, borderRadius: 8, marginBottom: 16 }}>
+        <strong>Game Mode:</strong>
+        <select 
+          value={gameMode} 
+          onChange={(e) => setGameMode(e.target.value as GameMode)}
+          style={{ marginLeft: 12, padding: '4px 8px', borderRadius: 4 }}
+          aria-label="Game Mode"
+        >
+          <option value={GameMode.HUMAN_VS_BOT}>Human vs Bot</option>
+          <option value={GameMode.HUMAN_VS_HUMAN}>Human vs Human</option>
         </select>
       </div>
 
@@ -195,15 +226,21 @@ export default function Backgammon() {
         ) : (
           <button
             onClick={rollDice}
-            disabled={turn !== PlayerColor.WHITE || gameState !== 'playing'}
+            disabled={gameMode === GameMode.HUMAN_VS_BOT ? 
+              (turn !== PlayerColor.WHITE || gameState !== 'playing') : 
+              gameState !== 'playing'}
             style={{
               marginLeft: 12,
-              background: turn === PlayerColor.WHITE ? '#059669' : '#666',
+              background: gameMode === GameMode.HUMAN_VS_BOT ? 
+                (turn === PlayerColor.WHITE ? '#059669' : '#666') : 
+                '#059669',
               color: 'white',
               border: 'none',
               borderRadius: 4,
               padding: '8px 16px',
-              cursor: turn === PlayerColor.WHITE ? 'pointer' : 'not-allowed',
+              cursor: gameMode === GameMode.HUMAN_VS_BOT ? 
+                (turn === PlayerColor.WHITE ? 'pointer' : 'not-allowed') : 
+                'pointer',
             }}
           >
             Roll Dice
@@ -270,14 +307,14 @@ export default function Backgammon() {
       <div style={{ marginBottom: 16 }}>
         <button 
           onClick={handleUndo} 
-          disabled={historyIndex === 0 || turn !== PlayerColor.WHITE}
+          disabled={historyIndex === 0 || (gameMode === GameMode.HUMAN_VS_BOT && turn !== PlayerColor.WHITE)}
           style={{ marginRight: 8, background: '#6366f1', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 4, cursor: 'pointer' }}
         >
           ↩ Undo
         </button>
         <button 
           onClick={handleRedo} 
-          disabled={historyIndex === history.length - 1 || turn !== PlayerColor.WHITE}
+          disabled={historyIndex === history.length - 1 || (gameMode === GameMode.HUMAN_VS_BOT && turn !== PlayerColor.WHITE)}
           style={{ background: '#6366f1', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 4, cursor: 'pointer' }}
         >
           ↪ Redo

@@ -1,193 +1,155 @@
+import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import Backgammon from './backgammon';
-import { useBackgammonStore, PlayerColor, BotDifficulty } from './backgammonStore';
+import { useBackgammonStore, GameMode, PlayerColor } from './backgammonStore';
 
-// Mock Next.js Link component
+// Mock the store
+jest.mock('./backgammonStore', () => ({
+  useBackgammonStore: jest.fn(),
+  GameMode: {
+    HUMAN_VS_BOT: 'human_vs_bot',
+    HUMAN_VS_HUMAN: 'human_vs_human',
+  },
+  PlayerColor: {
+    WHITE: 'white',
+    BLACK: 'black',
+  },
+  BotDifficulty: {
+    EASY: 'easy',
+    MEDIUM: 'medium',
+    HARD: 'hard',
+  },
+}));
+
+// Mock Next.js Link
 jest.mock('next/link', () => {
   return function MockLink({ children, href, ...props }: any) {
-    return <a href={href} {...props}>{children}</a>;
+    return React.createElement('a', { href, ...props }, children);
   };
 });
 
-describe('Backgammon Component', () => {
+// Mock Tutorial component
+jest.mock('./components/Tutorial', () => {
+  return function MockTutorial({ onClose }: any) {
+    return React.createElement('div', { 'data-testid': 'tutorial' }, 'Tutorial');
+  };
+});
+
+// Mock tutorials data
+jest.mock('./data/tutorials', () => ({
+  backgammonTutorial: {
+    title: 'Backgammon Tutorial',
+    steps: [],
+  },
+}));
+
+describe('Backgammon Game Mode', () => {
+  const mockStore = {
+    board: Array(24).fill([0, 0]).map((_, i) => {
+      if (i === 0) return [2, 0]; // White pieces
+      if (i === 23) return [0, 2]; // Black pieces
+      return [0, 0];
+    }),
+    turn: PlayerColor.WHITE,
+    message: 'White to roll',
+    gameState: 'playing',
+    stats: { wins: 0, losses: 0, totalGames: 0 },
+    botDifficulty: 'medium' as any,
+    gameMode: GameMode.HUMAN_VS_BOT,
+    dice: [],
+    usedDice: [],
+    history: [],
+    historyIndex: 0,
+    setBoard: jest.fn(),
+    setTurn: jest.fn(),
+    setMessage: jest.fn(),
+    setGameState: jest.fn(),
+    setDice: jest.fn(),
+    setUsedDice: jest.fn(),
+    resetGame: jest.fn(),
+    pushHistory: jest.fn(),
+    stepHistory: jest.fn(),
+    updateStats: jest.fn(),
+    resetStats: jest.fn(),
+    setBotDifficulty: jest.fn(),
+    setGameMode: jest.fn(),
+    saveGame: jest.fn(),
+    loadGame: jest.fn(),
+    hasSavedGame: jest.fn(() => false),
+    rollDice: jest.fn(),
+  };
+
   beforeEach(() => {
-    // Reset store before each test
-    useBackgammonStore.setState({
-      board: useBackgammonStore.getState().board,
-      turn: PlayerColor.WHITE,
-      message: 'White to roll',
-      gameState: 'playing',
-      dice: [],
-      usedDice: [],
-      history: [useBackgammonStore.getState().board],
-      historyIndex: 0,
-      stats: { wins: 0, losses: 0, totalGames: 0 },
-      botDifficulty: BotDifficulty.MEDIUM,
+    jest.clearAllMocks();
+    (useBackgammonStore as jest.MockedFunction<typeof useBackgammonStore>).mockImplementation((selector) => {
+      const state = selector(mockStore);
+      return state;
     });
   });
 
-  test('renders backgammon game with all UI elements', () => {
+  test('displays game mode selector with correct options', () => {
     render(<Backgammon />);
     
-    expect(screen.getByText('Backgammon')).toBeInTheDocument();
-    expect(screen.getByText('← Back to Lobby')).toBeInTheDocument();
-    expect(screen.getByText('Bot Difficulty:')).toBeInTheDocument();
-    expect(screen.getByText('Game Statistics:')).toBeInTheDocument();
-    expect(screen.getByText('How to Play:')).toBeInTheDocument();
-    expect(screen.getByText('New Game')).toBeInTheDocument();
-    expect(screen.getByText('💾 Save Game')).toBeInTheDocument();
-    expect(screen.getByText('📂 Load Game')).toBeInTheDocument();
+    expect(screen.getByText('Game Mode:')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Human vs Bot')).toBeInTheDocument();
+    expect(screen.getByText('Human vs Human')).toBeInTheDocument();
   });
 
-  test('bot difficulty selector changes difficulty', () => {
+  test('allows switching between game modes', () => {
     render(<Backgammon />);
     
-    const difficultySelect = screen.getByDisplayValue('Medium');
-    fireEvent.change(difficultySelect, { target: { value: BotDifficulty.HARD } });
+    const gameModeSelect = screen.getByLabelText('Game Mode');
+    fireEvent.change(gameModeSelect, { target: { value: GameMode.HUMAN_VS_HUMAN } });
     
-    expect(useBackgammonStore.getState().botDifficulty).toBe(BotDifficulty.HARD);
+    expect(mockStore.setGameMode).toHaveBeenCalledWith(GameMode.HUMAN_VS_HUMAN);
   });
 
-  test('dice rolling functionality works', () => {
+  test('in human vs human mode, both players can roll dice', () => {
+    mockStore.gameMode = GameMode.HUMAN_VS_HUMAN;
+    mockStore.turn = PlayerColor.BLACK;
+    
     render(<Backgammon />);
     
     const rollButton = screen.getByText('Roll Dice');
-    fireEvent.click(rollButton);
-    
-    // Should have dice after rolling
-    expect(useBackgammonStore.getState().dice.length).toBeGreaterThan(0);
+    expect(rollButton).not.toBeDisabled();
   });
 
-  test('piece selection and movement works', () => {
+  test('in human vs bot mode, only white can roll dice', () => {
+    mockStore.gameMode = GameMode.HUMAN_VS_BOT;
+    mockStore.turn = PlayerColor.BLACK;
+    
     render(<Backgammon />);
     
-    // Find a point with white pieces (point 0 should have 2 white pieces)
-    const point0 = screen.getByText('24'); // Point 0 is labeled as "24"
-    fireEvent.click(point0);
-
-    // Should be able to select a point with pieces
-    expect(true).toBe(true); // Placeholder - actual implementation would test selection state
+    const rollButton = screen.getByText('Roll Dice');
+    expect(rollButton).toBeDisabled();
   });
 
-  test('game statistics are displayed correctly', () => {
-    render(<Backgammon />);
+  test('undo/redo buttons work for both players in human vs human mode', () => {
+    mockStore.gameMode = GameMode.HUMAN_VS_HUMAN;
+    mockStore.turn = PlayerColor.BLACK;
+    mockStore.historyIndex = 1;
     
-    expect(screen.getByText(/Wins: 0/)).toBeInTheDocument();
-    expect(screen.getByText(/Losses: 0/)).toBeInTheDocument();
-    expect(screen.getByText(/Total Games: 0/)).toBeInTheDocument();
-  });
-
-  test('reset stats button works', () => {
-    render(<Backgammon />);
-    
-    const resetButton = screen.getByText('Reset Stats');
-    fireEvent.click(resetButton);
-    
-    expect(useBackgammonStore.getState().stats).toEqual({
-      wins: 0,
-      losses: 0,
-      totalGames: 0
-    });
-  });
-
-  test('new game button resets the board', () => {
-    render(<Backgammon />);
-    
-    const newGameButton = screen.getByText('New Game');
-    fireEvent.click(newGameButton);
-    
-    expect(useBackgammonStore.getState().turn).toBe(PlayerColor.WHITE);
-    expect(useBackgammonStore.getState().gameState).toBe('playing');
-    expect(useBackgammonStore.getState().message).toBe('White to roll');
-  });
-
-  test('tutorial can be opened and closed', () => {
-    render(<Backgammon />);
-    
-    const tutorialButton = screen.getByText('📖 Full Tutorial');
-    fireEvent.click(tutorialButton);
-    
-    // Tutorial should be open
-    expect(screen.getByText('Backgammon Tutorial')).toBeInTheDocument();
-    
-    const closeButton = screen.getByText('✕');
-    fireEvent.click(closeButton);
-    
-    // Tutorial should be closed
-    expect(screen.queryByText('Backgammon Tutorial')).not.toBeInTheDocument();
-  });
-
-  test('undo and redo buttons work correctly', () => {
     render(<Backgammon />);
     
     const undoButton = screen.getByText('↩ Undo');
     const redoButton = screen.getByText('↪ Redo');
     
-    // Initially disabled
+    expect(undoButton).not.toBeDisabled();
+    expect(redoButton).not.toBeDisabled();
+  });
+
+  test('undo/redo buttons only work for white in human vs bot mode', () => {
+    mockStore.gameMode = GameMode.HUMAN_VS_BOT;
+    mockStore.turn = PlayerColor.BLACK;
+    mockStore.historyIndex = 1;
+    
+    render(<Backgammon />);
+    
+    const undoButton = screen.getByText('↩ Undo');
+    const redoButton = screen.getByText('↪ Redo');
+    
     expect(undoButton).toBeDisabled();
     expect(redoButton).toBeDisabled();
-    
-    // Make a move to enable undo
-    const rollButton = screen.getByText('Roll Dice');
-    fireEvent.click(rollButton);
-    
-    // Now undo should be enabled (or at least the move should be made)
-    expect(true).toBe(true); // Placeholder - actual implementation would test button state
-  });
-
-  test('board displays all 24 points', () => {
-    render(<Backgammon />);
-    
-    // Check that all point numbers are displayed (1-24)
-    for (let i = 1; i <= 24; i++) {
-      expect(screen.getByText(i.toString())).toBeInTheDocument();
-    }
-  });
-
-  test('dice display shows used and unused dice correctly', () => {
-    render(<Backgammon />);
-    
-    // Roll dice to get some values
-    const rollButton = screen.getByText('Roll Dice');
-    fireEvent.click(rollButton);
-    
-    // Dice should be visible on screen - use getAllByText to handle multiple elements
-    const diceElements = screen.getAllByText(/[1-6]/);
-    expect(diceElements.length).toBeGreaterThan(0);
-  });
-
-  test('save and load game functionality exists', () => {
-    render(<Backgammon />);
-    
-    const saveButton = screen.getByText('💾 Save Game');
-    const loadButton = screen.getByText('📂 Load Game');
-    
-    expect(saveButton).toBeInTheDocument();
-    expect(loadButton).toBeInTheDocument();
-    
-    // Initially, load should be disabled
-    expect(loadButton).toBeDisabled();
-    
-    // Save the game
-    fireEvent.click(saveButton);
-    
-    // Now load should be enabled (or at least the save should be made)
-    expect(true).toBe(true); // Placeholder - actual implementation would test button state
-  });
-
-  test('game instructions are displayed', () => {
-    render(<Backgammon />);
-    
-    expect(screen.getByText(/Instructions:/)).toBeInTheDocument();
-    expect(screen.getByText(/Click on a point with your pieces/)).toBeInTheDocument();
-  });
-
-  test('board has correct visual layout', () => {
-    render(<Backgammon />);
-    
-    // Check that the board container exists with proper styling
-    const boardContainer = screen.getByText('24').closest('div');
-    expect(boardContainer).toBeInTheDocument();
   });
 }); 

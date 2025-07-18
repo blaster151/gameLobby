@@ -11,6 +11,11 @@ export enum BotDifficulty {
   HARD = 'hard',
 }
 
+export enum GameMode {
+  HUMAN_VS_BOT = 'human_vs_bot',
+  HUMAN_VS_HUMAN = 'human_vs_human',
+}
+
 export type Point = number[]; // Array of piece counts for each player
 export type Board = Point[];
 export type Dice = number[];
@@ -77,6 +82,7 @@ function saveGameState(state: any) {
       history: state.history,
       historyIndex: state.historyIndex,
       botDifficulty: state.botDifficulty,
+      gameMode: state.gameMode,
     }));
   }
 }
@@ -182,28 +188,30 @@ function makeBotMove(board: Board, turn: PlayerColor, dice: Dice, usedDice: numb
 }
 
 interface BackgammonState {
-  board: Board;
+  board: Point[];
   turn: PlayerColor;
   message: string;
   gameState: string;
-  dice: Dice;
-  usedDice: number[];
-  history: Board[];
+  history: Point[][];
   historyIndex: number;
   stats: GameStats;
   botDifficulty: BotDifficulty;
-  setBoard: (b: Board) => void;
+  gameMode: GameMode;
+  dice: number[];
+  usedDice: number[];
+  setBoard: (b: Point[]) => void;
   setTurn: (t: PlayerColor) => void;
   setMessage: (m: string) => void;
   setGameState: (s: string) => void;
-  setDice: (d: Dice) => void;
+  setDice: (d: number[]) => void;
   setUsedDice: (d: number[]) => void;
   resetGame: () => void;
-  pushHistory: (b: Board) => void;
+  pushHistory: (b: Point[]) => void;
   stepHistory: (dir: 1 | -1) => void;
   updateStats: (result: 'win' | 'loss') => void;
   resetStats: () => void;
   setBotDifficulty: (difficulty: BotDifficulty) => void;
+  setGameMode: (mode: GameMode) => void;
   saveGame: () => void;
   loadGame: () => void;
   hasSavedGame: () => boolean;
@@ -221,6 +229,7 @@ export const useBackgammonStore = create<BackgammonState>((set, get) => {
     history: [initialBoard()],
     historyIndex: 0,
     botDifficulty: BotDifficulty.MEDIUM,
+    gameMode: GameMode.HUMAN_VS_BOT,
   };
 
   return {
@@ -234,6 +243,7 @@ export const useBackgammonStore = create<BackgammonState>((set, get) => {
     historyIndex: initialState.historyIndex,
     stats: typeof window !== 'undefined' ? loadStats() : { wins: 0, losses: 0, totalGames: 0 },
     botDifficulty: initialState.botDifficulty,
+    gameMode: initialState.gameMode,
     setBoard: (b) => set({ board: b }),
     setTurn: (t) => set({ turn: t }),
     setMessage: (m) => set({ message: m }),
@@ -252,6 +262,7 @@ export const useBackgammonStore = create<BackgammonState>((set, get) => {
         historyIndex: 0,
         stats: state.stats,
         botDifficulty: state.botDifficulty,
+        gameMode: state.gameMode,
       };
       saveStats(state.stats);
       return newState;
@@ -284,6 +295,7 @@ export const useBackgammonStore = create<BackgammonState>((set, get) => {
       saveStats(zeroStats);
     },
     setBotDifficulty: (difficulty) => set({ botDifficulty: difficulty }),
+    setGameMode: (mode) => set({ gameMode: mode }),
     saveGame: () => {
       const state = get();
       saveGameState(state);
@@ -300,6 +312,7 @@ export const useBackgammonStore = create<BackgammonState>((set, get) => {
           history: savedState.history,
           historyIndex: savedState.historyIndex,
           botDifficulty: savedState.botDifficulty,
+          gameMode: savedState.gameMode || GameMode.HUMAN_VS_BOT,
           message: savedState.gameState === 'playing' ? 'White to roll' : 'Game Over',
         });
       }
@@ -308,14 +321,14 @@ export const useBackgammonStore = create<BackgammonState>((set, get) => {
       return loadGameState() !== null;
     },
     rollDice: () => {
-      const { turn, gameState } = get();
+      const { turn, gameState, gameMode } = get();
       if (gameState !== 'playing') return;
       
       const newDice = rollDice();
       set({ dice: newDice, usedDice: [] });
       
-      // Bot rolls if it's black's turn
-      if (turn === PlayerColor.BLACK) {
+      // Bot rolls if it's black's turn and we're in human vs bot mode
+      if (turn === PlayerColor.BLACK && gameMode === GameMode.HUMAN_VS_BOT) {
         setTimeout(() => {
           const currentState = get();
           if (currentState.turn === PlayerColor.BLACK && currentState.gameState === 'playing') {
