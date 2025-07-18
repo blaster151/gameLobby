@@ -31,10 +31,10 @@ Checkers:
         No validation that captures are mandatory when available
         âœ… Missing edge case handling for board boundaries
         âœ… No stalemate detection
-        Simplified diagonal movement validation
+        âœ… Simplified diagonal movement validation
     Simplified bot AI
-        No look-ahead for capture sequences
-        Basic positional evaluation only
+        ✓ No look-ahead for capture sequences
+        ✓ Basic positional evaluation only
         No strategic planning for king creation
         Missing endgame tactics
 Chess:

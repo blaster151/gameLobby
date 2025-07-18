@@ -58,6 +58,13 @@ export default function Checkers() {
   const [keyboardFocus, setKeyboardFocus] = React.useState<[number, number]>([0, 0]);
   const [showTutorial, setShowTutorial] = React.useState(false);
 
+  // Trigger bot move when it's bot's turn
+  React.useEffect(() => {
+    if (turn === PieceType.BOT && gameState === 'playing' && gameMode === GameMode.HUMAN_VS_BOT) {
+      setTimeout(() => botMove(board), 100);
+    }
+  }, [turn, gameState, gameMode, board]);
+
   function checkGameState(board: Board): string {
     const playerPieces = board.flat().filter(cell => cell === PieceType.PLAYER || cell === PieceType.PLAYER_KING).length;
     const botPieces = board.flat().filter(cell => cell === PieceType.BOT || cell === PieceType.BOT_KING).length;
@@ -176,18 +183,21 @@ export default function Checkers() {
         if (piece === player || (player === PieceType.PLAYER && piece === PieceType.PLAYER_KING) || (player === PieceType.BOT && piece === PieceType.BOT_KING)) {
           const isKingPiece = isKing(piece);
           
-          // Define possible directions
-          const directions = isKingPiece ? [-1, 1] : [player === PieceType.PLAYER ? -1 : 1];
+          // Check all possible diagonal moves
+          const diagonalOffsets = [
+            [-1, -1], // northwest
+            [-1, 1],  // northeast
+            [1, -1],  // southwest
+            [1, 1]    // southeast
+          ];
           
-          for (const dir of directions) {
-            const ny = y + dir;
-            if (ny >= 0 && ny < BOARD_SIZE) {
-              if (x - 1 >= 0 && board[ny][x - 1] === PieceType.EMPTY) {
-                moves.push([y, x, ny, x - 1]);
-              }
-              if (x + 1 < BOARD_SIZE && board[ny][x + 1] === PieceType.EMPTY) {
-                moves.push([y, x, ny, x + 1]);
-              }
+          for (const [yOffset, xOffset] of diagonalOffsets) {
+            const ny = y + yOffset;
+            const nx = x + xOffset;
+            
+            // Check if the move is valid
+            if (isValidMove(board, y, x, ny, nx, player)) {
+              moves.push([y, x, ny, nx]);
             }
           }
         }
@@ -207,32 +217,30 @@ export default function Checkers() {
           const opponent = player === PieceType.PLAYER ? PieceType.BOT : PieceType.PLAYER;
           const opponentKing = player === PieceType.PLAYER ? PieceType.BOT_KING : PieceType.PLAYER_KING;
           
-          // Define possible directions
-          const directions = isKingPiece ? [-1, 1] : [player === PieceType.PLAYER ? -1 : 1];
+          // Check all possible diagonal capture directions
+          const diagonalOffsets = [
+            [-1, -1], // northwest
+            [-1, 1],  // northeast
+            [1, -1],  // southwest
+            [1, 1]    // southeast
+          ];
           
-          for (const dir of directions) {
-            // Check diagonal captures
-            const captureY = y + dir;
-            const captureX1 = x - 1;
-            const captureX2 = x + 1;
-            const landingY = y + (dir * 2);
-            const landingX1 = x - 2;
-            const landingX2 = x + 2;
+          for (const [yOffset, xOffset] of diagonalOffsets) {
+            const captureY = y + yOffset;
+            const captureX = x + xOffset;
+            const landingY = y + (yOffset * 2);
+            const landingX = x + (xOffset * 2);
             
-            // Check left diagonal capture
-            if (captureY >= 0 && captureY < BOARD_SIZE && captureX1 >= 0 && 
-                (board[captureY][captureX1] === opponent || board[captureY][captureX1] === opponentKing) &&
-                landingY >= 0 && landingY < BOARD_SIZE && landingX1 >= 0 && 
-                board[landingY][landingX1] === PieceType.EMPTY) {
-              captures.push([y, x, landingY, landingX1]);
-            }
-            
-            // Check right diagonal capture
-            if (captureY >= 0 && captureY < BOARD_SIZE && captureX2 < BOARD_SIZE && 
-                (board[captureY][captureX2] === opponent || board[captureY][captureX2] === opponentKing) &&
-                landingY >= 0 && landingY < BOARD_SIZE && landingX2 < BOARD_SIZE && 
-                board[landingY][landingX2] === PieceType.EMPTY) {
-              captures.push([y, x, landingY, landingX2]);
+            // Check if capture is valid
+            if (isValidPosition(captureY, captureX) && 
+                (board[captureY][captureX] === opponent || board[captureY][captureX] === opponentKing) &&
+                isValidPosition(landingY, landingX) && 
+                board[landingY][landingX] === PieceType.EMPTY) {
+              
+              // Additional validation: check if the move direction is valid for this piece
+              if (isValidMove(board, y, x, landingY, landingX, player)) {
+                captures.push([y, x, landingY, landingX]);
+              }
             }
           }
         }
@@ -248,6 +256,8 @@ export default function Checkers() {
 
   function evaluateBoard(board: Board): number {
     let score = 0;
+    
+    // Basic piece counting
     for (let y = 0; y < BOARD_SIZE; y++) {
       for (let x = 0; x < BOARD_SIZE; x++) {
         const piece = board[y][x];
@@ -262,7 +272,229 @@ export default function Checkers() {
         }
       }
     }
+    
+    // Advanced positional evaluation
+    score += evaluatePositionalAdvantage(board);
+    score += evaluateKingSafety(board);
+    score += evaluateCenterControl(board);
+    score += evaluateBackRowProtection(board);
+    score += evaluateMobility(board);
+    score += evaluatePieceCoordination(board);
+    score += evaluateEndgamePosition(board);
+    
     return score;
+  }
+
+  function evaluatePositionalAdvantage(board: Board): number {
+    let score = 0;
+    
+    // Position-based scoring for regular pieces
+    for (let y = 0; y < BOARD_SIZE; y++) {
+      for (let x = 0; x < BOARD_SIZE; x++) {
+        const piece = board[y][x];
+        
+        if (piece === PieceType.BOT) {
+          // Bot pieces get bonus for advancing towards player's back row
+          score += (7 - y) * 0.1; // Closer to promotion = better
+        } else if (piece === PieceType.PLAYER) {
+          // Player pieces get bonus for advancing towards bot's back row
+          score -= y * 0.1; // Closer to promotion = better for player
+        }
+      }
+    }
+    
+    return score;
+  }
+
+  function evaluateKingSafety(board: Board): number {
+    let score = 0;
+    
+    for (let y = 0; y < BOARD_SIZE; y++) {
+      for (let x = 0; x < BOARD_SIZE; x++) {
+        const piece = board[y][x];
+        
+        if (piece === PieceType.BOT_KING) {
+          // Kings are safer in corners and edges
+          if ((x === 0 || x === 7) && (y === 0 || y === 7)) {
+            score += 0.3; // Corner bonus
+          } else if (x === 0 || x === 7 || y === 0 || y === 7) {
+            score += 0.1; // Edge bonus
+          }
+        } else if (piece === PieceType.PLAYER_KING) {
+          if ((x === 0 || x === 7) && (y === 0 || y === 7)) {
+            score -= 0.3; // Corner bonus for player
+          } else if (x === 0 || x === 7 || y === 0 || y === 7) {
+            score -= 0.1; // Edge bonus for player
+          }
+        }
+      }
+    }
+    
+    return score;
+  }
+
+  function evaluateCenterControl(board: Board): number {
+    let score = 0;
+    
+    // Center squares (3,3), (3,4), (4,3), (4,4)
+    const centerSquares = [[3, 3], [3, 4], [4, 3], [4, 4]];
+    
+    for (const [y, x] of centerSquares) {
+      const piece = board[y][x];
+      if (piece === PieceType.BOT || piece === PieceType.BOT_KING) {
+        score += 0.2; // Control of center squares
+      } else if (piece === PieceType.PLAYER || piece === PieceType.PLAYER_KING) {
+        score -= 0.2; // Player control of center
+      }
+    }
+    
+    // Extended center (2,2) to (5,5)
+    for (let y = 2; y <= 5; y++) {
+      for (let x = 2; x <= 5; x++) {
+        const piece = board[y][x];
+        if (piece === PieceType.BOT || piece === PieceType.BOT_KING) {
+          score += 0.05; // Extended center control
+        } else if (piece === PieceType.PLAYER || piece === PieceType.PLAYER_KING) {
+          score -= 0.05; // Player extended center control
+        }
+      }
+    }
+    
+    return score;
+  }
+
+  function evaluateBackRowProtection(board: Board): number {
+    let score = 0;
+    
+    // Bot's back row (row 0)
+    for (let x = 0; x < BOARD_SIZE; x++) {
+      const piece = board[0][x];
+      if (piece === PieceType.BOT || piece === PieceType.BOT_KING) {
+        score += 0.15; // Back row protection
+      }
+    }
+    
+    // Player's back row (row 7)
+    for (let x = 0; x < BOARD_SIZE; x++) {
+      const piece = board[7][x];
+      if (piece === PieceType.PLAYER || piece === PieceType.PLAYER_KING) {
+        score -= 0.15; // Player back row protection
+      }
+    }
+    
+    return score;
+  }
+
+  function evaluateMobility(board: Board): number {
+    // Limit mobility evaluation to avoid performance issues
+    let botMoves = 0;
+    let playerMoves = 0;
+    
+    // Simple move counting without full validation
+    for (let y = 0; y < BOARD_SIZE; y++) {
+      for (let x = 0; x < BOARD_SIZE; x++) {
+        const piece = board[y][x];
+        if (piece === PieceType.BOT || piece === PieceType.BOT_KING) {
+          // Count potential diagonal moves
+          const directions = piece === PieceType.BOT_KING ? 
+            [[-1, -1], [-1, 1], [1, -1], [1, 1]] : 
+            [[1, -1], [1, 1]]; // Bot pieces move down
+          
+          for (const [dy, dx] of directions) {
+            const ny = y + dy;
+            const nx = x + dx;
+            if (isValidPosition(ny, nx) && board[ny][nx] === PieceType.EMPTY) {
+              botMoves++;
+            }
+          }
+        } else if (piece === PieceType.PLAYER || piece === PieceType.PLAYER_KING) {
+          // Count potential diagonal moves
+          const directions = piece === PieceType.PLAYER_KING ? 
+            [[-1, -1], [-1, 1], [1, -1], [1, 1]] : 
+            [[-1, -1], [-1, 1]]; // Player pieces move up
+          
+          for (const [dy, dx] of directions) {
+            const ny = y + dy;
+            const nx = x + dx;
+            if (isValidPosition(ny, nx) && board[ny][nx] === PieceType.EMPTY) {
+              playerMoves++;
+            }
+          }
+        }
+      }
+    }
+    
+    // Mobility advantage
+    const mobilityDiff = botMoves - playerMoves;
+    return mobilityDiff * 0.05; // Small bonus for having more moves
+  }
+
+  function evaluatePieceCoordination(board: Board): number {
+    let score = 0;
+    
+    // Check for connected pieces (pieces that can support each other)
+    for (let y = 0; y < BOARD_SIZE; y++) {
+      for (let x = 0; x < BOARD_SIZE; x++) {
+        const piece = board[y][x];
+        
+        if (piece === PieceType.BOT || piece === PieceType.BOT_KING) {
+          // Check for supporting pieces in adjacent squares
+          const adjacentSquares = [
+            [y - 1, x - 1], [y - 1, x + 1], [y + 1, x - 1], [y + 1, x + 1]
+          ];
+          
+          for (const [ay, ax] of adjacentSquares) {
+            if (isValidPosition(ay, ax) && 
+                (board[ay][ax] === PieceType.BOT || board[ay][ax] === PieceType.BOT_KING)) {
+              score += 0.05; // Connected pieces bonus
+            }
+          }
+        } else if (piece === PieceType.PLAYER || piece === PieceType.PLAYER_KING) {
+          // Check for supporting pieces in adjacent squares
+          const adjacentSquares = [
+            [y - 1, x - 1], [y - 1, x + 1], [y + 1, x - 1], [y + 1, x + 1]
+          ];
+          
+          for (const [ay, ax] of adjacentSquares) {
+            if (isValidPosition(ay, ax) && 
+                (board[ay][ax] === PieceType.PLAYER || board[ay][ax] === PieceType.PLAYER_KING)) {
+              score -= 0.05; // Player connected pieces penalty
+            }
+          }
+        }
+      }
+    }
+    
+    return score;
+  }
+
+  function evaluateEndgamePosition(board: Board): number {
+    let botPieces = 0;
+    let playerPieces = 0;
+    let botKings = 0;
+    let playerKings = 0;
+    
+    // Count pieces
+    for (let y = 0; y < BOARD_SIZE; y++) {
+      for (let x = 0; x < BOARD_SIZE; x++) {
+        const piece = board[y][x];
+        if (piece === PieceType.BOT) botPieces++;
+        else if (piece === PieceType.BOT_KING) botKings++;
+        else if (piece === PieceType.PLAYER) playerPieces++;
+        else if (piece === PieceType.PLAYER_KING) playerKings++;
+      }
+    }
+    
+    const totalBotPieces = botPieces + botKings;
+    const totalPlayerPieces = playerPieces + playerKings;
+    
+    // Endgame adjustments
+    if (totalBotPieces <= 3 || totalPlayerPieces <= 3) {
+      // In endgame, kings become more valuable
+      return (botKings - playerKings) * 0.5;
+    }
+    
+    return 0;
   }
 
   function botMoveEasy(currentBoard: Board) {
@@ -310,10 +542,14 @@ export default function Checkers() {
     
     for (const [sy, sx, dy, dx] of moves) {
       const newBoard = movePiece(currentBoard, sy, sx, dy, dx);
-      const score = evaluateBoard(newBoard);
+      let score = evaluateBoard(newBoard);
       
       // Bonus for moving towards the center
       const centerBonus = Math.abs(4 - dx) < Math.abs(4 - sx) ? 0.1 : 0;
+      
+      // Check for capture opportunities (basic look-ahead)
+      const captureValue = evaluateCaptureOpportunity(newBoard, PieceType.BOT);
+      score += captureValue * 0.5; // Smaller bonus for medium difficulty
       
       if (score + centerBonus > bestScore) {
         bestScore = score + centerBonus;
@@ -352,7 +588,7 @@ export default function Checkers() {
       return;
     }
     
-    // Look ahead 2 moves and choose the best option
+    // Look ahead for capture sequences and choose the best option
     let bestMove = moves[0];
     let bestScore = -Infinity;
     
@@ -360,13 +596,27 @@ export default function Checkers() {
       const newBoard = movePiece(currentBoard, sy, sx, dy, dx);
       let score = evaluateBoard(newBoard);
       
+      // Check for additional capture opportunities after this move
+      const additionalCaptures = findBestCaptureSequence(newBoard, PieceType.BOT, 3);
+      if (additionalCaptures.length > 0) {
+        // Bonus for capture sequences
+        score += additionalCaptures.length * 2;
+      }
+      
       // Simulate player's best response
       const playerMoves = getValidMoves(newBoard, PieceType.PLAYER);
       if (playerMoves.length > 0) {
         let worstPlayerScore = Infinity;
         for (const [psy, psx, pdy, pdx] of playerMoves) {
           const playerBoard = movePiece(newBoard, psy, psx, pdy, pdx);
-          const playerScore = evaluateBoard(playerBoard);
+          let playerScore = evaluateBoard(playerBoard);
+          
+          // Check if player can capture after this move
+          const playerCaptures = findBestCaptureSequence(playerBoard, PieceType.PLAYER, 2);
+          if (playerCaptures.length > 0) {
+            playerScore -= playerCaptures.length * 1.5; // Penalty for allowing player captures
+          }
+          
           worstPlayerScore = Math.min(worstPlayerScore, playerScore);
         }
         score = worstPlayerScore; // Assume player makes the best move
@@ -399,6 +649,72 @@ export default function Checkers() {
         setMessage('Stalemate! No valid moves for either player.');
       }
     }
+  }
+
+  function findBestCaptureSequence(board: Board, player: PieceType, maxDepth: number): Array<[number, number, number, number]> {
+    if (maxDepth <= 0) return [];
+    
+    const captures = getAvailableCaptures(board, player);
+    if (captures.length === 0) return [];
+    
+    let bestSequence: Array<[number, number, number, number]> = [];
+    let bestScore = -Infinity;
+    
+    for (const [sy, sx, dy, dx] of captures) {
+      const newBoard = movePiece(board, sy, sx, dy, dx);
+      const score = evaluateBoard(newBoard);
+      
+      // Recursively look for more captures
+      const nextCaptures = findBestCaptureSequence(newBoard, player, maxDepth - 1);
+      const totalScore = score + nextCaptures.length * 2;
+      
+      if (totalScore > bestScore) {
+        bestScore = totalScore;
+        bestSequence = [[sy, sx, dy, dx], ...nextCaptures];
+      }
+    }
+    
+    return bestSequence;
+  }
+
+  function evaluateCaptureOpportunity(board: Board, player: PieceType): number {
+    const captures = getAvailableCaptures(board, player);
+    if (captures.length === 0) return 0;
+    
+    let totalValue = 0;
+    for (const [sy, sx, dy, dx] of captures) {
+      const newBoard = movePiece(board, sy, sx, dy, dx);
+      const capturedPiece = board[sy + (dy - sy) / 2][sx + (dx - sx) / 2];
+      
+      // Value captured pieces
+      if (capturedPiece === PieceType.PLAYER || capturedPiece === PieceType.BOT) {
+        totalValue += 1;
+      } else if (capturedPiece === PieceType.PLAYER_KING || capturedPiece === PieceType.BOT_KING) {
+        totalValue += 2; // Kings are worth more
+      }
+      
+      // Bonus for capture sequences
+      const additionalCaptures = findBestCaptureSequence(newBoard, player, 2);
+      totalValue += additionalCaptures.length * 1.5;
+    }
+    
+    return totalValue;
+  }
+
+  function hasCaptureSequence(board: Board, player: PieceType, depth: number = 3): boolean {
+    if (depth <= 0) return false;
+    
+    const captures = getAvailableCaptures(board, player);
+    if (captures.length === 0) return false;
+    
+    for (const [sy, sx, dy, dx] of captures) {
+      const newBoard = movePiece(board, sy, sx, dy, dx);
+      if (hasCaptureSequence(newBoard, player, depth - 1)) {
+        return true;
+      }
+    }
+    
+    return true; // Current level has captures
   }
 
   function botMove(currentBoard: Board) {
@@ -434,12 +750,19 @@ export default function Checkers() {
     const piece = board[sy][sx];
     const isKingPiece = isKing(piece);
     
-    // Calculate direction
+    // Calculate direction vectors
     const yDiff = dy - sy;
-    const xDiff = Math.abs(dx - sx);
+    const xDiff = dx - sx;
     
-    // Must move diagonally
-    if (xDiff !== Math.abs(yDiff)) return false;
+    // Must move diagonally (both x and y must change by the same amount)
+    if (Math.abs(xDiff) !== Math.abs(yDiff)) {
+      return false;
+    }
+    
+    // Must actually move (not stay in same position)
+    if (xDiff === 0 && yDiff === 0) {
+      return false;
+    }
     
     // Check if this is a capture move
     const isCapture = Math.abs(yDiff) === 2;
@@ -449,16 +772,18 @@ export default function Checkers() {
       return false;
     }
     
-    // Regular pieces can only move forward
+    // Validate diagonal direction for regular pieces
     if (!isKingPiece) {
-      const dir = player === PieceType.PLAYER ? -1 : 1;
-      if (yDiff !== dir) return false;
+      const expectedYDir = player === PieceType.PLAYER ? -1 : 1;
+      if (yDiff !== expectedYDir) {
+        return false;
+      }
     }
     
     // For capture moves, validate the captured piece and its position
     if (isCapture) {
       const captureY = sy + (yDiff / 2);
-      const captureX = sx + ((dx - sx) / 2);
+      const captureX = sx + (xDiff / 2);
       
       // Validate capture position is within bounds
       if (!isValidPosition(captureY, captureX)) {
@@ -476,6 +801,61 @@ export default function Checkers() {
     
     // Kings can move in any diagonal direction
     return true;
+  }
+
+  function validateDiagonalMove(sy: number, sx: number, dy: number, dx: number): boolean {
+    const yDiff = dy - sy;
+    const xDiff = dx - sx;
+    
+    // Must move diagonally
+    if (Math.abs(xDiff) !== Math.abs(yDiff)) {
+      return false;
+    }
+    
+    // Must actually move
+    if (xDiff === 0 && yDiff === 0) {
+      return false;
+    }
+    
+    return true;
+  }
+
+  function getDiagonalDirection(sy: number, sx: number, dy: number, dx: number): 'northwest' | 'northeast' | 'southwest' | 'southeast' | null {
+    const yDiff = dy - sy;
+    const xDiff = dx - sx;
+    
+    if (!validateDiagonalMove(sy, sx, dy, dx)) {
+      return null;
+    }
+    
+    if (yDiff < 0 && xDiff < 0) return 'northwest';
+    if (yDiff < 0 && xDiff > 0) return 'northeast';
+    if (yDiff > 0 && xDiff < 0) return 'southwest';
+    if (yDiff > 0 && xDiff > 0) return 'southeast';
+    
+    return null;
+  }
+
+  function isValidDiagonalDirection(sy: number, sx: number, dy: number, dx: number, player: PieceType, isKingPiece: boolean): boolean {
+    const direction = getDiagonalDirection(sy, sx, dy, dx);
+    
+    if (!direction) {
+      return false;
+    }
+    
+    // Kings can move in any diagonal direction
+    if (isKingPiece) {
+      return true;
+    }
+    
+    // Regular pieces can only move forward
+    if (player === PieceType.PLAYER) {
+      // Player pieces move up (northwest or northeast)
+      return direction === 'northwest' || direction === 'northeast';
+    } else {
+      // Bot pieces move down (southwest or southeast)
+      return direction === 'southwest' || direction === 'southeast';
+    }
   }
 
   function isValidPosition(y: number, x: number): boolean {
