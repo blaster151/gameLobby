@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { useChessStore, ChessPiece, PlayerColor, BotDifficulty } from './chessStore';
+import { useChessStore, ChessPiece, PlayerColor, BotDifficulty, GameMode } from './chessStore';
 import Tutorial from './components/Tutorial';
 import { chessTutorial } from './data/tutorials';
 
@@ -428,6 +428,7 @@ export default function Chess() {
   const gameState = useChessStore(s => s.gameState);
   const stats = useChessStore(s => s.stats);
   const botDifficulty = useChessStore(s => s.botDifficulty);
+  const gameMode = useChessStore(s => s.gameMode);
   const setBoard = useChessStore(s => s.setBoard);
   const setSelected = useChessStore(s => s.setSelected);
   const setTurn = useChessStore(s => s.setTurn);
@@ -441,6 +442,7 @@ export default function Chess() {
   const updateStats = useChessStore(s => s.updateStats);
   const resetStats = useChessStore(s => s.resetStats);
   const setBotDifficulty = useChessStore(s => s.setBotDifficulty);
+  const setGameMode = useChessStore(s => s.setGameMode);
   const saveGame = useChessStore(s => s.saveGame);
   const loadGame = useChessStore(s => s.loadGame);
   const hasSavedGame = useChessStore(s => s.hasSavedGame);
@@ -458,6 +460,13 @@ export default function Chess() {
     const piece = board[y][x];
     const isPlayerTurn = turn === PlayerColor.WHITE;
     const isPlayerPiece = isWhitePiece(piece);
+    const isOpponentPiece = isBlackPiece(piece);
+    
+    // In human vs human mode, allow both players to move their pieces
+    // In human vs bot mode, only allow white (human) to move
+    const canMovePiece = gameMode === GameMode.HUMAN_VS_HUMAN ? 
+      (isPlayerTurn && isPlayerPiece) || (!isPlayerTurn && isOpponentPiece) :
+      (isPlayerTurn && isPlayerPiece);
     
     if (selected) {
       const [sy, sx] = selected;
@@ -501,48 +510,50 @@ export default function Chess() {
           setTurn(turn === PlayerColor.WHITE ? PlayerColor.BLACK : PlayerColor.WHITE);
           setMessage(turn === PlayerColor.WHITE ? 'Black to move' : 'White to move');
           
-          // Bot move after player move
-          setTimeout(() => {
-            const currentBoard = useChessStore.getState().board;
-            const currentTurn = useChessStore.getState().turn;
-            const currentGameState = useChessStore.getState().gameState;
-            
-            if (currentTurn === PlayerColor.BLACK && currentGameState === 'playing') {
-              const botMove = makeBotMove(currentBoard, botDifficulty);
-              if (botMove) {
-                const [fromY, fromX, toY, toX] = botMove;
-                const botBoard = clone(currentBoard);
-                botBoard[toY][toX] = botBoard[fromY][fromX];
-                botBoard[fromY][fromX] = ChessPiece.EMPTY;
-                useChessStore.getState().setBoard(botBoard);
-                useChessStore.getState().pushHistory(botBoard);
-                useChessStore.getState().setLastMove([fromY, fromX, toY, toX]);
-                
-                // Check for game end after bot move
-                const botGameOverResult = isGameOver(botBoard, true); // White's turn now
-                if (botGameOverResult.isOver) {
-                  if (botGameOverResult.result === 'win') {
-                    useChessStore.getState().setGameState('won');
-                    useChessStore.getState().setMessage('Checkmate! White wins!');
-                    useChessStore.getState().updateStats('win');
-                  } else if (botGameOverResult.result === 'loss') {
-                    useChessStore.getState().setGameState('lost');
-                    useChessStore.getState().setMessage('Checkmate! Black wins!');
-                    useChessStore.getState().updateStats('loss');
-                  } else if (botGameOverResult.result === 'stalemate') {
-                    useChessStore.getState().setGameState('draw');
-                    useChessStore.getState().setMessage('Stalemate! Game is a draw.');
+          // Bot move after player move (only in HUMAN_VS_BOT mode)
+          if (gameMode === GameMode.HUMAN_VS_BOT) {
+            setTimeout(() => {
+              const currentBoard = useChessStore.getState().board;
+              const currentTurn = useChessStore.getState().turn;
+              const currentGameState = useChessStore.getState().gameState;
+              
+              if (currentTurn === PlayerColor.BLACK && currentGameState === 'playing') {
+                const botMove = makeBotMove(currentBoard, botDifficulty);
+                if (botMove) {
+                  const [fromY, fromX, toY, toX] = botMove;
+                  const botBoard = clone(currentBoard);
+                  botBoard[toY][toX] = botBoard[fromY][fromX];
+                  botBoard[fromY][fromX] = ChessPiece.EMPTY;
+                  useChessStore.getState().setBoard(botBoard);
+                  useChessStore.getState().pushHistory(botBoard);
+                  useChessStore.getState().setLastMove([fromY, fromX, toY, toX]);
+                  
+                  // Check for game end after bot move
+                  const botGameOverResult = isGameOver(botBoard, true); // White's turn now
+                  if (botGameOverResult.isOver) {
+                    if (botGameOverResult.result === 'win') {
+                      useChessStore.getState().setGameState('won');
+                      useChessStore.getState().setMessage('Checkmate! White wins!');
+                      useChessStore.getState().updateStats('win');
+                    } else if (botGameOverResult.result === 'loss') {
+                      useChessStore.getState().setGameState('lost');
+                      useChessStore.getState().setMessage('Checkmate! Black wins!');
+                      useChessStore.getState().updateStats('loss');
+                    } else if (botGameOverResult.result === 'stalemate') {
+                      useChessStore.getState().setGameState('draw');
+                      useChessStore.getState().setMessage('Stalemate! Game is a draw.');
+                    }
+                  } else {
+                    useChessStore.getState().setTurn(PlayerColor.WHITE);
+                    useChessStore.getState().setMessage('White to move');
                   }
-                } else {
-                  useChessStore.getState().setTurn(PlayerColor.WHITE);
-                  useChessStore.getState().setMessage('White to move');
                 }
               }
-            }
-          }, 500);
+            }, 500);
+          }
         }
       }
-    } else if (isPlayerTurn && isPlayerPiece) {
+    } else if (canMovePiece) {
       setSelected([y, x]);
     }
   }
@@ -623,45 +634,47 @@ export default function Chess() {
       setTurn(turn === PlayerColor.WHITE ? PlayerColor.BLACK : PlayerColor.WHITE);
       setMessage(turn === PlayerColor.WHITE ? 'Black to move' : 'White to move');
       
-      // Bot move after player move
-      setTimeout(() => {
-        const currentBoard = useChessStore.getState().board;
-        const currentTurn = useChessStore.getState().turn;
-        const currentGameState = useChessStore.getState().gameState;
-        
-        if (currentTurn === PlayerColor.BLACK && currentGameState === 'playing') {
-          const botMove = makeBotMove(currentBoard, botDifficulty);
-          if (botMove) {
-            const [fromY, fromX, toY, toX] = botMove;
-            const botBoard = clone(currentBoard);
-            botBoard[toY][toX] = botBoard[fromY][fromX];
-            botBoard[fromY][fromX] = ChessPiece.EMPTY;
-            useChessStore.getState().setBoard(botBoard);
-            useChessStore.getState().pushHistory(botBoard);
-            useChessStore.getState().setLastMove([fromY, fromX, toY, toX]);
-            
-            // Check for game end after bot move
-            const botGameOverResult = isGameOver(botBoard, true); // White's turn now
-            if (botGameOverResult.isOver) {
-              if (botGameOverResult.result === 'win') {
-                useChessStore.getState().setGameState('won');
-                useChessStore.getState().setMessage('Checkmate! White wins!');
-                useChessStore.getState().updateStats('win');
-              } else if (botGameOverResult.result === 'loss') {
-                useChessStore.getState().setGameState('lost');
-                useChessStore.getState().setMessage('Checkmate! Black wins!');
-                useChessStore.getState().updateStats('loss');
-              } else if (botGameOverResult.result === 'stalemate') {
-                useChessStore.getState().setGameState('draw');
-                useChessStore.getState().setMessage('Stalemate! Game is a draw.');
+      // Bot move after player move (only in HUMAN_VS_BOT mode)
+      if (gameMode === GameMode.HUMAN_VS_BOT) {
+        setTimeout(() => {
+          const currentBoard = useChessStore.getState().board;
+          const currentTurn = useChessStore.getState().turn;
+          const currentGameState = useChessStore.getState().gameState;
+          
+          if (currentTurn === PlayerColor.BLACK && currentGameState === 'playing') {
+            const botMove = makeBotMove(currentBoard, botDifficulty);
+            if (botMove) {
+              const [fromY, fromX, toY, toX] = botMove;
+              const botBoard = clone(currentBoard);
+              botBoard[toY][toX] = botBoard[fromY][fromX];
+              botBoard[fromY][fromX] = ChessPiece.EMPTY;
+              useChessStore.getState().setBoard(botBoard);
+              useChessStore.getState().pushHistory(botBoard);
+              useChessStore.getState().setLastMove([fromY, fromX, toY, toX]);
+              
+              // Check for game end after bot move
+              const botGameOverResult = isGameOver(botBoard, true); // White's turn now
+              if (botGameOverResult.isOver) {
+                if (botGameOverResult.result === 'win') {
+                  useChessStore.getState().setGameState('won');
+                  useChessStore.getState().setMessage('Checkmate! White wins!');
+                  useChessStore.getState().updateStats('win');
+                } else if (botGameOverResult.result === 'loss') {
+                  useChessStore.getState().setGameState('lost');
+                  useChessStore.getState().setMessage('Checkmate! Black wins!');
+                  useChessStore.getState().updateStats('loss');
+                } else if (botGameOverResult.result === 'stalemate') {
+                  useChessStore.getState().setGameState('draw');
+                  useChessStore.getState().setMessage('Stalemate! Game is a draw.');
+                }
+              } else {
+                useChessStore.getState().setTurn(PlayerColor.WHITE);
+                useChessStore.getState().setMessage('White to move');
               }
-            } else {
-              useChessStore.getState().setTurn(PlayerColor.WHITE);
-              useChessStore.getState().setMessage('White to move');
             }
           }
-        }
-      }, 500);
+        }, 500);
+      }
     }
   }
 
@@ -685,6 +698,20 @@ export default function Chess() {
           <option value={BotDifficulty.EASY}>Easy</option>
           <option value={BotDifficulty.MEDIUM}>Medium</option>
           <option value={BotDifficulty.HARD}>Hard</option>
+        </select>
+      </div>
+
+      {/* Game Mode Selector */}
+      <div style={{ background: '#333', padding: 12, borderRadius: 8, marginBottom: 16 }}>
+        <strong>Game Mode:</strong>
+        <select 
+          value={gameMode} 
+          onChange={(e) => setGameMode(e.target.value as GameMode)}
+          style={{ marginLeft: 12, padding: '4px 8px', borderRadius: 4 }}
+          aria-label="Game Mode"
+        >
+          <option value={GameMode.HUMAN_VS_BOT}>Human vs Bot</option>
+          <option value={GameMode.HUMAN_VS_HUMAN}>Human vs Human</option>
         </select>
       </div>
 

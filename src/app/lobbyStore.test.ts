@@ -2,7 +2,9 @@ import { useLobbyStore } from './lobbyStore';
 
 describe('Lobby Store', () => {
   beforeEach(() => {
-    // Reset store to initial state
+    localStorage.clear();
+    jest.resetModules();
+    // Reset store to initial state with only one player in demo-1
     useLobbyStore.setState({
       lobbies: [
         {
@@ -12,7 +14,6 @@ describe('Lobby Store', () => {
           maxPlayers: 2,
           players: [
             { id: 'player-1', name: 'Alice', isHost: true, isReady: true, isSpectator: false },
-            { id: 'player-2', name: 'Bob', isHost: false, isReady: false, isSpectator: false },
           ],
           isPrivate: false,
           status: 'waiting',
@@ -137,6 +138,12 @@ describe('Lobby Store', () => {
 
   it('prevents joining as player when lobby is full but allows spectators', () => {
     const { joinLobby, joinAsSpectator } = useLobbyStore.getState();
+    
+    // First join to fill the lobby
+    joinLobby('demo-1', 'Charlie');
+    
+    // Reset to test second join
+    useLobbyStore.setState({ currentLobby: null, currentPlayer: null });
     
     // Try to join as player (should fail - lobby is full)
     joinLobby('demo-1', 'Player3');

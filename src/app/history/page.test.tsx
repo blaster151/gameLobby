@@ -18,9 +18,17 @@ describe('Game History Page', () => {
     render(<GameHistory />);
     expect(screen.getByText('Overall Statistics')).toBeInTheDocument();
     expect(screen.getByText('Total Games')).toBeInTheDocument();
-    expect(screen.getByText('Wins')).toBeInTheDocument();
-    expect(screen.getByText('Losses')).toBeInTheDocument();
-    expect(screen.getByText('Draws')).toBeInTheDocument();
+    
+    // Use getAllByText since these appear multiple times
+    const winsElements = screen.getAllByText('Wins');
+    expect(winsElements.length).toBeGreaterThan(0);
+    
+    const lossesElements = screen.getAllByText('Losses');
+    expect(lossesElements.length).toBeGreaterThan(0);
+    
+    const drawsElements = screen.getAllByText('Draws');
+    expect(drawsElements.length).toBeGreaterThan(0);
+    
     expect(screen.getByText('Win Rate')).toBeInTheDocument();
     expect(screen.getByText('Avg Duration')).toBeInTheDocument();
   });
@@ -56,9 +64,16 @@ describe('Game History Page', () => {
 
   it('displays result icons correctly', () => {
     render(<GameHistory />);
-    expect(screen.getByText('🏆')).toBeInTheDocument(); // Win
-    expect(screen.getByText('💔')).toBeInTheDocument(); // Loss
-    expect(screen.getByText('🤝')).toBeInTheDocument(); // Draw
+    
+    // Use getAllByText since these appear multiple times
+    const winIcons = screen.getAllByText('🏆');
+    expect(winIcons.length).toBeGreaterThan(0);
+    
+    const lossIcons = screen.getAllByText('💔');
+    expect(lossIcons.length).toBeGreaterThan(0);
+    
+    const drawIcons = screen.getAllByText('🤝');
+    expect(drawIcons.length).toBeGreaterThan(0);
   });
 
   it('shows game statistics correctly', () => {
