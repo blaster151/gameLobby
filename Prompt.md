@@ -4,7 +4,7 @@ Repeat this process 3x:
 |        Find an incremental way to improve the system or pull it closer to the stated vision.
 |        Implement it.
 |        Add or augment a unit test to reflect it.
-|
+|        Do not run tests right now because they hang Cursor.
 |    Commit with a significant message.
 |    Please do not prompt me for trivial confirmations as I am AFK half the time.
 
